@@ -1,0 +1,791 @@
+import random
+import json
+import tkinter as tk
+from tkinter import ttk, messagebox, scrolledtext
+from dataclasses import dataclass, asdict
+from typing import List, Dict, Optional, Tuple
+from enum import Enum
+
+class DiceType(Enum):
+    D3 = 3
+    D6 = 6
+    D10 = 10
+
+class ResourceType(Enum):
+    MATERIALS = "Materials"
+    BIOLOGICS = "Biologics"
+    MINERALS = "Minerals"
+
+class GovernanceArea(Enum):
+    LOGISTICS = "Logistics"
+    SECURITY = "Security"
+    INTELLIGENCE = "Intelligence"
+
+@dataclass
+class DicePool:
+    """Represents a dice pool like 2D6 or D3+D10"""
+    dice: List[DiceType]
+    
+    def roll(self) -> int:
+        """Roll all dice in the pool and return the sum"""
+        return sum(random.randint(1, die.value) for die in self.dice)
+    
+    def __str__(self) -> str:
+        if not self.dice:
+            return "0"
+        
+        # Count occurrences of each die type
+        counts = {}
+        for die in self.dice:
+            counts[die] = counts.get(die, 0) + 1
+        
+        # Format as "2D6+D10" etc.
+        parts = []
+        for die_type, count in sorted(counts.items(), key=lambda x: x[0].value):
+            if count == 1:
+                parts.append(f"D{die_type.value}")
+            else:
+                parts.append(f"{count}D{die_type.value}")
+        
+        return "+".join(parts)
+
+@dataclass
+class Subordinate:
+    """Represents a subordinate with their skills and needs"""
+    name: str
+    logistics: DicePool
+    security: DicePool
+    intelligence: DicePool
+    need: Optional[str] = None
+    need_fulfilled: bool = False
+    current_task: Optional[str] = None
+    
+    def get_stat(self, area: GovernanceArea) -> DicePool:
+        """Get the dice pool for a specific governance area"""
+        if area == GovernanceArea.LOGISTICS:
+            return self.logistics
+        elif area == GovernanceArea.SECURITY:
+            return self.security
+        else:
+            return self.intelligence
+    
+    def roll_for_area(self, area: GovernanceArea) -> int:
+        """Roll dice for a specific governance area"""
+        base_roll = self.get_stat(area).roll()
+        bonus = 2 if self.need_fulfilled else 0
+        return base_roll + bonus
+
+@dataclass
+class Task:
+    """Represents a task that can be assigned to subordinates"""
+    name: str
+    area: GovernanceArea
+    progress: int = 0
+    required_progress: int = 10
+    assigned_subordinate: Optional[str] = None
+    description: str = ""
+    duration_ticks: Optional[int] = None
+    
+    @property
+    def is_complete(self) -> bool:
+        return self.progress >= self.required_progress
+    
+    @property
+    def completion_percentage(self) -> float:
+        return min(100.0, (self.progress / self.required_progress) * 100)
+
+@dataclass
+class Resources:
+    """Tracks the three main resource types"""
+    materials: int = 50
+    biologics: int = 30
+    minerals: int = 20
+    
+    def add(self, resource_type: ResourceType, amount: int):
+        """Add resources of a specific type"""
+        if resource_type == ResourceType.MATERIALS:
+            self.materials += amount
+        elif resource_type == ResourceType.BIOLOGICS:
+            self.biologics += amount
+        elif resource_type == ResourceType.MINERALS:
+            self.minerals += amount
+    
+    def subtract(self, resource_type: ResourceType, amount: int) -> bool:
+        """Subtract resources if available, return True if successful"""
+        if resource_type == ResourceType.MATERIALS:
+            if self.materials >= amount:
+                self.materials -= amount
+                return True
+        elif resource_type == ResourceType.BIOLOGICS:
+            if self.biologics >= amount:
+                self.biologics -= amount
+                return True
+        elif resource_type == ResourceType.MINERALS:
+            if self.minerals >= amount:
+                self.minerals -= amount
+                return True
+        return False
+
+class GameState:
+    """Main game state manager"""
+    
+    def __init__(self):
+        self.day = 1
+        self.resources = Resources()
+        self.subordinates = self._generate_starting_subordinates()
+        self.tasks = []
+        self.completed_tasks = []
+        self.events_log = []
+        self.imperial_tribute_due = 7  # Days until tribute is due
+        self.imperial_tribute_amount = 30  # Materials needed
+        
+    def _generate_starting_subordinates(self) -> List[Subordinate]:
+        """Generate starting subordinates with random stats"""
+        names = [
+            "Administrator Vex", "Strategos Korrath", "Courtier Illyana",
+            "Overseer Grimm", "Captain Nerys"
+        ]
+        
+        subordinates = []
+        for name in names[:3]:  # Start with 3 subordinates
+            # Generate random dice pools
+            logistics = DicePool([random.choice(list(DiceType))])
+            security = DicePool([random.choice(list(DiceType))])
+            intelligence = DicePool([random.choice(list(DiceType))])
+            
+            # Sometimes add a second die
+            if random.random() < 0.3:
+                logistics.dice.append(random.choice(list(DiceType)))
+            if random.random() < 0.3:
+                security.dice.append(random.choice(list(DiceType)))
+            if random.random() < 0.3:
+                intelligence.dice.append(random.choice(list(DiceType)))
+            
+            # Random need
+            needs = [
+                "Luxurious quarters", "Rare spices", "Combat stimulants",
+                "Information network access", "Personal guard detail", None
+            ]
+            need = random.choice(needs)
+            
+            subordinates.append(Subordinate(name, logistics, security, intelligence, need))
+        
+        return subordinates
+    
+    def add_task(
+        self,
+        name: str,
+        area: GovernanceArea,
+        required_progress: int = 10,
+        description: str = "",
+        duration_ticks: Optional[int] = None,
+    ):
+        """Add a task. Duration-based tasks advance once per tick; skill-based tasks roll for progress."""
+        task = Task(
+            name,
+            area,
+            required_progress=duration_ticks if duration_ticks is not None else required_progress,
+            description=description,
+            duration_ticks=duration_ticks,
+        )
+        self.tasks.append(task)
+    
+    def assign_subordinate_to_task(self, subordinate_name: str, task_name: str) -> bool:
+        """Assign an available subordinate to an unassigned task."""
+        subordinate = next((s for s in self.subordinates if s.name == subordinate_name), None)
+        task = next((t for t in self.tasks if t.name == task_name and not t.is_complete), None)
+        if subordinate is None or task is None:
+            return False
+        if subordinate.current_task and subordinate.current_task != task_name:
+            return False
+        if task.assigned_subordinate and task.assigned_subordinate != subordinate_name:
+            return False
+        subordinate.current_task = task_name
+        task.assigned_subordinate = subordinate_name
+        return True
+
+    def advance_tick(self):
+        """Advance the game by one day"""
+        self.day += 1
+        self.imperial_tribute_due -= 1
+        
+        # Process tasks
+        for task in self.tasks:
+            if task.assigned_subordinate and not task.is_complete:
+                subordinate = next(
+                    (s for s in self.subordinates if s.name == task.assigned_subordinate),
+                    None,
+                )
+                if subordinate is None:
+                    task.assigned_subordinate = None
+                    self.events_log.append(
+                        f"Day {self.day}: Task '{task.name}' paused because its assigned subordinate is missing."
+                    )
+                    continue
+
+                progress = 1 if task.duration_ticks is not None else subordinate.roll_for_area(task.area)
+                task.progress = min(task.required_progress, task.progress + progress)
+                self.events_log.append(
+                    f"Day {self.day}: {subordinate.name} made {progress} progress on {task.name}"
+                )
+
+                if task.is_complete:
+                    self.completed_tasks.append(task)
+                    subordinate.current_task = None
+                    task.assigned_subordinate = None
+                    self.events_log.append(f"Day {self.day}: Task '{task.name}' completed!")
+
+        # Remove completed tasks
+        self.tasks = [t for t in self.tasks if not t.is_complete]
+        
+        # Resource generation (basic)
+        self.resources.add(ResourceType.MATERIALS, random.randint(1, 3))
+        self.resources.add(ResourceType.BIOLOGICS, random.randint(1, 2))
+        self.resources.add(ResourceType.MINERALS, random.randint(0, 2))
+        
+        # Check imperial tribute
+        if self.imperial_tribute_due <= 0:
+            self._handle_imperial_tribute()
+        
+        # Random events (placeholder)
+        if random.random() < 0.1:
+            self._generate_random_event()
+    
+    def _handle_imperial_tribute(self):
+        """Handle imperial tribute payment"""
+        if self.resources.materials >= self.imperial_tribute_amount:
+            self.resources.subtract(ResourceType.MATERIALS, self.imperial_tribute_amount)
+            self.events_log.append(f"Day {self.day}: Imperial tribute of {self.imperial_tribute_amount} Materials paid.")
+            self.imperial_tribute_due = 30  # Next tribute in 30 days
+        else:
+            self.events_log.append(f"Day {self.day}: WARNING: Failed to pay Imperial tribute! Consequences incoming...")
+            self.imperial_tribute_due = 7  # Grace period
+    
+    def _generate_random_event(self):
+        """Generate a random event"""
+        events = [
+            "Asteroid mining yields extra minerals!",
+            "Food riots in the lower sectors - biologics consumed.",
+            "Equipment malfunction - materials needed for repairs.",
+            "Merchant convoy arrives with trade opportunities.",
+            "Heretic cell discovered in the manufacturing district."
+        ]
+        
+        event = random.choice(events)
+        self.events_log.append(f"Day {self.day}: {event}")
+        
+        # Apply event effects (simplified)
+        if "minerals" in event:
+            self.resources.add(ResourceType.MINERALS, random.randint(3, 8))
+        elif "biologics consumed" in event:
+            self.resources.subtract(ResourceType.BIOLOGICS, random.randint(5, 10))
+        elif "materials needed" in event:
+            self.resources.subtract(ResourceType.MATERIALS, random.randint(3, 7))
+
+class GDSAGui:
+    """Main GUI class for the Grimdark System Admin game"""
+    
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Grimdark System Admin")
+        self.root.geometry("1200x800")
+        self.root.configure(bg='#2b2b2b')
+        
+        # Initialize game
+        self.game = GameState()
+        self._initialize_game_tasks()
+        
+        # Automation controls
+        self.is_running = False
+        self.current_speed = "Paused"
+        self.speed_intervals = {
+            "Slow": 2000,      # 2 seconds per tick
+            "Normal": 1000,    # 1 second per tick
+            "Fast": 500,       # 0.5 seconds per tick
+            "Paused": None
+        }
+        self.automation_job = None
+        
+        # Setup GUI
+        self._setup_styles()
+        self._create_widgets()
+        self._update_display()
+        
+    def _initialize_game_tasks(self):
+        """Add starting tasks to the game"""
+        self.game.add_task("Improve Mining Operations", GovernanceArea.LOGISTICS, 15, 
+                          "Increase mineral extraction efficiency")
+        self.game.add_task("Security Patrol Schedule", GovernanceArea.SECURITY, 12,
+                          "Organize patrols to maintain order")
+        self.game.add_task("Noble Relations", GovernanceArea.INTELLIGENCE, 20,
+                          "Gather intelligence on local noble houses")
+        self.game.add_task(
+            "Test Action: Administrative Audit",
+            GovernanceArea.INTELLIGENCE,
+            duration_ticks=5,
+            description="Development test: completes after exactly five simulation ticks.",
+        )
+    
+    def _setup_styles(self):
+        """Setup ttk styles for dark theme"""
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
+        
+        # Configure dark theme
+        self.style.configure('TFrame', background='#2b2b2b')
+        self.style.configure('TLabel', background='#2b2b2b', foreground='#ffffff')
+        self.style.configure('Title.TLabel', background='#2b2b2b', foreground='#ffffff', font=('Arial', 12, 'bold'))
+        self.style.configure('TButton', background='#404040', foreground='#ffffff')
+        self.style.map('TButton', 
+                      background=[('active', '#505050'), ('pressed', '#303030'), ('disabled', '#606060')])
+        self.style.configure('TNotebook', background='#2b2b2b')
+        self.style.configure('TNotebook.Tab', background='#404040', foreground='#ffffff')
+        self.style.map('TNotebook.Tab',
+                      background=[('selected', '#505050')])
+    
+    def _create_widgets(self):
+        """Create and arrange GUI widgets"""
+        # Main container
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Title
+        title_label = ttk.Label(main_frame, text="GRIMDARK SYSTEM ADMIN", style='Title.TLabel', font=('Arial', 16, 'bold'))
+        title_label.pack(pady=(0, 10))
+        
+        # Top panel - Status and Controls
+        top_frame = ttk.Frame(main_frame)
+        top_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Day and Tribute info
+        self.status_frame = ttk.Frame(top_frame)
+        self.status_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        self.day_label = ttk.Label(self.status_frame, text="Day 1", font=('Arial', 14, 'bold'))
+        self.day_label.pack(anchor=tk.W)
+        
+        self.tribute_label = ttk.Label(self.status_frame, text="Imperial Tribute Due: 7 days")
+        self.tribute_label.pack(anchor=tk.W)
+        
+        # Controls
+        controls_frame = ttk.Frame(top_frame)
+        controls_frame.pack(side=tk.RIGHT)
+        
+        # Speed controls frame
+        speed_frame = ttk.Frame(controls_frame)
+        speed_frame.pack(side=tk.LEFT, padx=(0, 15))
+        
+        # Speed label
+        speed_label = ttk.Label(speed_frame, text="Automation:", font=('Arial', 10, 'bold'))
+        speed_label.pack(side=tk.TOP)
+        
+        # Speed buttons frame
+        speed_buttons_frame = ttk.Frame(speed_frame)
+        speed_buttons_frame.pack(side=tk.TOP)
+        
+        # Play/Pause button
+        self.play_pause_button = ttk.Button(speed_buttons_frame, text="▶️ Play", command=self._toggle_play_pause, width=8)
+        self.play_pause_button.pack(side=tk.LEFT, padx=(0, 2))
+        
+        # Speed selection buttons
+        self.slow_button = ttk.Button(speed_buttons_frame, text="Slow", command=lambda: self._set_speed("Slow"), width=6)
+        self.slow_button.pack(side=tk.LEFT, padx=1)
+        
+        self.normal_button = ttk.Button(speed_buttons_frame, text="Normal", command=lambda: self._set_speed("Normal"), width=7)
+        self.normal_button.pack(side=tk.LEFT, padx=1)
+        
+        self.fast_button = ttk.Button(speed_buttons_frame, text="Fast", command=lambda: self._set_speed("Fast"), width=6)
+        self.fast_button.pack(side=tk.LEFT, padx=1)
+        
+        # Current speed indicator
+        self.speed_indicator = ttk.Label(speed_frame, text="Speed: Paused", font=('Arial', 9))
+        self.speed_indicator.pack(side=tk.TOP, pady=(2, 0))
+        
+        # Manual controls frame
+        manual_frame = ttk.Frame(controls_frame)
+        manual_frame.pack(side=tk.LEFT, padx=(0, 10))
+        
+        manual_label = ttk.Label(manual_frame, text="Manual:", font=('Arial', 10, 'bold'))
+        manual_label.pack(side=tk.TOP)
+        
+        self.tick_button = ttk.Button(manual_frame, text="Single Tick", command=self._advance_tick, width=10)
+        self.tick_button.pack(side=tk.TOP)
+        
+        # New game button
+        self.new_game_button = ttk.Button(controls_frame, text="New Game", command=self._new_game)
+        self.new_game_button.pack(side=tk.LEFT)
+        
+        # Main content area with notebook
+        self.notebook = ttk.Notebook(main_frame)
+        self.notebook.pack(fill=tk.BOTH, expand=True)
+        
+        # Resources tab
+        self._create_resources_tab()
+        
+        # Subordinates tab
+        self._create_subordinates_tab()
+        
+        # Tasks tab
+        self._create_tasks_tab()
+        
+        # Events tab
+        self._create_events_tab()
+    
+    def _create_resources_tab(self):
+        """Create the resources tab"""
+        resources_frame = ttk.Frame(self.notebook)
+        self.notebook.add(resources_frame, text="Resources")
+        
+        # Resources display
+        resources_label = ttk.Label(resources_frame, text="RESOURCE STOCKPILES", style='Title.TLabel')
+        resources_label.pack(pady=(10, 20))
+        
+        self.resources_frame = ttk.Frame(resources_frame)
+        self.resources_frame.pack(fill=tk.X, padx=20)
+        
+        # Create resource displays
+        self.material_label = ttk.Label(self.resources_frame, text="Materials: 50", font=('Arial', 12))
+        self.material_label.pack(anchor=tk.W, pady=5)
+        
+        self.biologics_label = ttk.Label(self.resources_frame, text="Biologics: 30", font=('Arial', 12))
+        self.biologics_label.pack(anchor=tk.W, pady=5)
+        
+        self.minerals_label = ttk.Label(self.resources_frame, text="Minerals: 20", font=('Arial', 12))
+        self.minerals_label.pack(anchor=tk.W, pady=5)
+    
+    def _create_subordinates_tab(self):
+        """Create the subordinates tab"""
+        subordinates_frame = ttk.Frame(self.notebook)
+        self.notebook.add(subordinates_frame, text="Subordinates")
+        
+        subordinates_label = ttk.Label(subordinates_frame, text="YOUR SUBORDINATES", style='Title.TLabel')
+        subordinates_label.pack(pady=(10, 20))
+        
+        # Scrollable frame for subordinates
+        canvas = tk.Canvas(subordinates_frame, bg='#2b2b2b', highlightthickness=0)
+        scrollbar = ttk.Scrollbar(subordinates_frame, orient="vertical", command=canvas.yview)
+        self.subordinates_scrollable_frame = ttk.Frame(canvas)
+        
+        self.subordinates_scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=self.subordinates_scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side="left", fill="both", expand=True, padx=(20, 0))
+        scrollbar.pack(side="right", fill="y", padx=(0, 20))
+    
+    def _create_tasks_tab(self):
+        """Create the tasks tab"""
+        tasks_frame = ttk.Frame(self.notebook)
+        self.notebook.add(tasks_frame, text="Tasks")
+        
+        tasks_label = ttk.Label(tasks_frame, text="ACTIVE TASKS", style='Title.TLabel')
+        tasks_label.pack(pady=(10, 20))
+        
+        # Create task assignment interface
+        assignment_frame = ttk.Frame(tasks_frame)
+        assignment_frame.pack(fill=tk.X, padx=20, pady=(0, 20))
+        
+        ttk.Label(assignment_frame, text="Assign Task:").pack(side=tk.LEFT)
+        
+        self.subordinate_var = tk.StringVar()
+        self.subordinate_combo = ttk.Combobox(assignment_frame, textvariable=self.subordinate_var, width=20)
+        self.subordinate_combo.pack(side=tk.LEFT, padx=(5, 10))
+        
+        ttk.Label(assignment_frame, text="to").pack(side=tk.LEFT)
+        
+        self.task_var = tk.StringVar()
+        self.task_combo = ttk.Combobox(assignment_frame, textvariable=self.task_var, width=30)
+        self.task_combo.pack(side=tk.LEFT, padx=(10, 5))
+        
+        assign_button = ttk.Button(assignment_frame, text="Assign", command=self._assign_task)
+        assign_button.pack(side=tk.LEFT, padx=(5, 0))
+        
+        # Scrollable frame for tasks
+        canvas = tk.Canvas(tasks_frame, bg='#2b2b2b', highlightthickness=0)
+        scrollbar = ttk.Scrollbar(tasks_frame, orient="vertical", command=canvas.yview)
+        self.tasks_scrollable_frame = ttk.Frame(canvas)
+        
+        self.tasks_scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=self.tasks_scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side="left", fill="both", expand=True, padx=(20, 0))
+        scrollbar.pack(side="right", fill="y", padx=(0, 20))
+    
+    def _create_events_tab(self):
+        """Create the events tab"""
+        events_frame = ttk.Frame(self.notebook)
+        self.notebook.add(events_frame, text="Events Log")
+        
+        events_label = ttk.Label(events_frame, text="EVENTS LOG", style='Title.TLabel')
+        events_label.pack(pady=(10, 20))
+        
+        # Events text area
+        self.events_text = scrolledtext.ScrolledText(
+            events_frame,
+            wrap=tk.WORD,
+            height=25,
+            bg='#1a1a1a',
+            fg='#ffffff',
+            font=('Courier', 10)
+        )
+        self.events_text.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
+    
+    def _update_display(self):
+        """Update all display elements"""
+        self._update_status()
+        self._update_resources()
+        self._update_subordinates()
+        self._update_tasks()
+        self._update_events()
+        self._update_comboboxes()
+        self._update_speed_buttons()
+    
+    def _update_status(self):
+        """Update status display"""
+        self.day_label.config(text=f"Day {self.game.day}")
+        
+        if self.game.imperial_tribute_due <= 3:
+            tribute_text = f"⚠️ Imperial Tribute Due: {self.game.imperial_tribute_due} days ({self.game.imperial_tribute_amount} Materials)"
+        else:
+            tribute_text = f"Imperial Tribute Due: {self.game.imperial_tribute_due} days ({self.game.imperial_tribute_amount} Materials)"
+        self.tribute_label.config(text=tribute_text)
+    
+    def _update_resources(self):
+        """Update resources display"""
+        self.material_label.config(text=f"Materials: {self.game.resources.materials}")
+        self.biologics_label.config(text=f"Biologics: {self.game.resources.biologics}")
+        self.minerals_label.config(text=f"Minerals: {self.game.resources.minerals}")
+    
+    def _update_subordinates(self):
+        """Update subordinates display"""
+        # Clear existing widgets
+        for widget in self.subordinates_scrollable_frame.winfo_children():
+            widget.destroy()
+        
+        for subordinate in self.game.subordinates:
+            sub_frame = ttk.Frame(self.subordinates_scrollable_frame)
+            sub_frame.pack(fill=tk.X, pady=10, padx=10)
+            
+            # Name and current task
+            name_text = subordinate.name
+            if subordinate.current_task:
+                name_text += f" (Working on: {subordinate.current_task})"
+            
+            name_label = ttk.Label(sub_frame, text=name_text, font=('Arial', 12, 'bold'))
+            name_label.pack(anchor=tk.W)
+            
+            # Stats
+            stats_text = f"Logistics: {subordinate.logistics} | Security: {subordinate.security} | Intelligence: {subordinate.intelligence}"
+            stats_label = ttk.Label(sub_frame, text=stats_text)
+            stats_label.pack(anchor=tk.W)
+            
+            # Need
+            if subordinate.need:
+                need_text = f"Need: {subordinate.need}"
+                if subordinate.need_fulfilled:
+                    need_text += " ✅"
+                else:
+                    need_text += " ❌"
+                need_label = ttk.Label(sub_frame, text=need_text)
+                need_label.pack(anchor=tk.W)
+            
+            # Separator
+            separator = ttk.Frame(sub_frame, height=2)
+            separator.pack(fill=tk.X, pady=(10, 0))
+    
+    def _update_tasks(self):
+        """Update tasks display"""
+        # Clear existing widgets
+        for widget in self.tasks_scrollable_frame.winfo_children():
+            widget.destroy()
+        
+        for task in self.game.tasks:
+            task_frame = ttk.Frame(self.tasks_scrollable_frame)
+            task_frame.pack(fill=tk.X, pady=10, padx=10)
+            
+            # Task name and area
+            name_label = ttk.Label(task_frame, text=f"{task.name} ({task.area.value})", font=('Arial', 12, 'bold'))
+            name_label.pack(anchor=tk.W)
+            
+            # Progress bar
+            progress_frame = ttk.Frame(task_frame)
+            progress_frame.pack(fill=tk.X, pady=5)
+            
+            progress_bar = ttk.Progressbar(progress_frame, length=300, mode='determinate')
+            progress_bar['value'] = task.completion_percentage
+            progress_bar.pack(side=tk.LEFT)
+            
+            progress_label = ttk.Label(progress_frame, text=f"{task.progress}/{task.required_progress} ({task.completion_percentage:.1f}%)")
+            progress_label.pack(side=tk.LEFT, padx=(10, 0))
+            
+            # Assignment
+            if task.assigned_subordinate:
+                assigned_label = ttk.Label(task_frame, text=f"Assigned to: {task.assigned_subordinate}")
+                assigned_label.pack(anchor=tk.W)
+            
+            # Description
+            if task.description:
+                desc_label = ttk.Label(task_frame, text=f"Description: {task.description}")
+                desc_label.pack(anchor=tk.W)
+            
+            # Separator
+            separator = ttk.Frame(task_frame, height=2)
+            separator.pack(fill=tk.X, pady=(10, 0))
+    
+    def _update_events(self):
+        """Update events log"""
+        self.events_text.delete('1.0', tk.END)
+        
+        # Show recent events (last 50)
+        recent_events = self.game.events_log[-50:] if len(self.game.events_log) > 50 else self.game.events_log
+        
+        for event in recent_events:
+            self.events_text.insert(tk.END, event + "\n")
+        
+        # Scroll to bottom
+        self.events_text.see(tk.END)
+    
+    def _update_comboboxes(self):
+        """Update combobox values"""
+        subordinate_names = [sub.name for sub in self.game.subordinates]
+        self.subordinate_combo['values'] = subordinate_names
+        
+        task_names = [task.name for task in self.game.tasks]
+        self.task_combo['values'] = task_names
+    
+    def _advance_tick(self):
+        """Advance the game by one tick"""
+        self.game.advance_tick()
+        self._update_display()
+        
+        # Show any urgent messages
+        if self.game.imperial_tribute_due <= 0:
+            if self.game.resources.materials < self.game.imperial_tribute_amount:
+                messagebox.showwarning("Imperial Tribute", "Warning: Insufficient materials for Imperial tribute!")
+    
+    def _assign_task(self):
+        """Assign a subordinate to a task"""
+        subordinate_name = self.subordinate_var.get()
+        task_name = self.task_var.get()
+        
+        if subordinate_name and task_name:
+            if self.game.assign_subordinate_to_task(subordinate_name, task_name):
+                messagebox.showinfo("Assignment", f"{subordinate_name} assigned to {task_name}")
+                self._update_display()
+            else:
+                messagebox.showerror("Assignment Failed", "Could not assign subordinate to task")
+        else:
+            messagebox.showwarning("Assignment", "Please select both a subordinate and a task")
+    
+    def _new_game(self):
+        """Start a new game"""
+        result = messagebox.askyesno("New Game", "Are you sure you want to start a new game?")
+        if result:
+            # Stop automation
+            self._stop_automation()
+            
+            # Reset game
+            self.game = GameState()
+            self._initialize_game_tasks()
+            self._update_display()
+    
+    def _toggle_play_pause(self):
+        """Toggle between play and pause"""
+        if self.is_running:
+            self._pause_automation()
+        else:
+            self._start_automation()
+    
+    def _set_speed(self, speed):
+        """Set the automation speed"""
+        self.current_speed = speed
+        if self.is_running:
+            self._stop_automation()
+            self._start_automation()
+        else:
+            self._update_speed_buttons()
+    
+    def _start_automation(self):
+        """Start automated ticking"""
+        if self.current_speed != "Paused" and self.current_speed in self.speed_intervals:
+            self.is_running = True
+            interval = self.speed_intervals[self.current_speed]
+            self._schedule_next_tick(interval)
+            self._update_speed_buttons()
+    
+    def _pause_automation(self):
+        """Pause automated ticking"""
+        self._stop_automation()
+        self._update_speed_buttons()
+    
+    def _stop_automation(self):
+        """Stop automated ticking"""
+        self.is_running = False
+        if self.automation_job:
+            self.root.after_cancel(self.automation_job)
+            self.automation_job = None
+    
+    def _schedule_next_tick(self, interval):
+        """Schedule the next automated tick"""
+        if self.is_running:
+            self.automation_job = self.root.after(interval, self._automated_tick)
+    
+    def _automated_tick(self):
+        """Perform an automated tick"""
+        if self.is_running:
+            self._advance_tick()
+            interval = self.speed_intervals[self.current_speed]
+            self._schedule_next_tick(interval)
+    
+    def _update_speed_buttons(self):
+        """Update the appearance of speed control buttons"""
+        # Update play/pause button
+        if self.is_running:
+            self.play_pause_button.config(text="⏸️ Pause")
+        else:
+            self.play_pause_button.config(text="▶️ Play")
+        
+        # Update speed indicator
+        if self.is_running:
+            self.speed_indicator.config(text=f"Speed: {self.current_speed}")
+        else:
+            self.speed_indicator.config(text="Speed: Paused")
+        
+        # Update speed button styles (highlight current speed)
+        speed_buttons = {
+            "Slow": self.slow_button,
+            "Normal": self.normal_button,
+            "Fast": self.fast_button
+        }
+        
+        for speed_name, button in speed_buttons.items():
+            if speed_name == self.current_speed and self.is_running:
+                # Highlight active speed
+                button.config(state='disabled')
+            else:
+                button.config(state='normal')
+
+def main():
+    """Main function to run the GUI"""
+    root = tk.Tk()
+    app = GDSAGui(root)
+    
+    # Ensure automation stops when window is closed
+    def on_closing():
+        app._stop_automation()
+        root.destroy()
+    
+    root.protocol("WM_DELETE_WINDOW", on_closing)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()

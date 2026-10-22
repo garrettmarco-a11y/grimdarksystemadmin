@@ -1,0 +1,10 @@
+[project]
+name = "grimdark-system-admin"
+version = "0.1.0"
+description = "A Python/Tkinter grimdark space-feudal administration simulation prototype"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.unittest]
+# Tests are run with: python -m unittest discover -s tests -v
