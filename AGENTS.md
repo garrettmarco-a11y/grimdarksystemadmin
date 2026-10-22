@@ -13,7 +13,7 @@ Before changing code, read:
 4. `docs/ARCHITECTURE.md`
 5. The relevant code and tests
 
-The currently working implementation is `src/grimdark_system_admin.py`. It is intentionally still a single file to preserve the known-good baseline. Do not assume the missing GameMaker project exists.
+The implementation is the `src/gdsa/` package: simulation rules in `models.py` and `simulation.py` (no Tkinter), presentation in `ui.py`, entry point in `app.py`. `src/grimdark_system_admin.py` is a thin launcher. Do not assume the missing GameMaker project exists.
 
 ## Working rules
 

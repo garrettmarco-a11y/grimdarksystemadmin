@@ -9,8 +9,8 @@ This repository is being organized for incremental development with Git and a co
 - Working baseline: the existing single-file Python/Tkinter prototype.
 - Simulation includes subordinate skill dice, task assignment and progress, resource inventories, daily ticks, tribute, and random events.
 - A deterministic five-tick `Test Action: Administrative Audit` is included to validate the task lifecycle.
-- The simulation and GUI are still in one Python module. Separating them is a planned refactor, not a prerequisite for running the current version.
-- The GUI has been reported as working on the user's machine. Automated tests cover selected simulation behavior; the GUI is not covered by automated UI tests.
+- Simulation logic lives in a Tkinter-free package (`src/gdsa/`), so the tests run without a display or a Tkinter install.
+- Automated tests cover the simulation rules; the GUI is not covered by automated UI tests and should be checked by launching it.
 
 ## Requirements
 
@@ -26,6 +26,8 @@ From the repository root:
 python src/grimdark_system_admin.py
 ```
 
+Equivalently: `PYTHONPATH=src python -m gdsa`.
+
 If `python` points to Python 2 or is unavailable, use `python3` on macOS/Linux or `py -3` on Windows.
 
 ## Test
@@ -34,7 +36,18 @@ If `python` points to Python 2 or is unavailable, use `python3` on macOS/Linux o
 python -m unittest discover -s tests -v
 ```
 
-The tests use only Python's standard library.
+The tests use only Python's standard library and do not require Tkinter.
+
+## Layout
+
+```
+src/grimdark_system_admin.py   launcher (keeps the documented run command)
+src/gdsa/models.py             enums, dice pools, subordinates, tasks, resources
+src/gdsa/simulation.py         GameState, tick rules, starting tasks (no Tkinter)
+src/gdsa/ui.py                 Tkinter GUI
+src/gdsa/app.py                entry point (main)
+tests/                         unittest suite
+```
 
 ## Project guide
 
@@ -45,16 +58,8 @@ The tests use only Python's standard library.
 - `docs/WORKFLOW.md` — recommended Git and coding-agent workflow.
 - `docs/DECISIONS.md` — decisions already made and open questions.
 
-## First development milestone
+## Next development milestone
 
-Preserve the current working loop. Improve the code's testability and separation of concerns before adding large new systems. The next gameplay addition proposed for after that cleanup is a simple food inventory/production action, but it should be implemented only as a small, tested feature.
+Simulation and GUI are now separated (a Stage B entry criterion). The next proposed gameplay addition is a simple food inventory/production action, implemented as a small, tested feature once its acceptance criteria are agreed. See `docs/ROADMAP.md`.
 
-## Git quick start
-
-```bash
-git init
-git add .
-git commit -m "chore: establish playable Python prototype"
-```
-
-Create a private or public GitHub repository as appropriate, then follow GitHub's instructions for adding the remote and pushing the initial branch. Do not commit local save data, credentials, virtual environments, or editor caches.
+Do not commit local save data, credentials, virtual environments, or editor caches; `.gitignore` covers the common cases.

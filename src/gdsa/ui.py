@@ -1,286 +1,9 @@
-import random
-import json
+"""Tkinter presentation layer. Renders GameState; game rules live in gdsa.simulation."""
+
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
-from dataclasses import dataclass, asdict
-from typing import List, Dict, Optional, Tuple
-from enum import Enum
 
-class DiceType(Enum):
-    D3 = 3
-    D6 = 6
-    D10 = 10
-
-class ResourceType(Enum):
-    MATERIALS = "Materials"
-    BIOLOGICS = "Biologics"
-    MINERALS = "Minerals"
-
-class GovernanceArea(Enum):
-    LOGISTICS = "Logistics"
-    SECURITY = "Security"
-    INTELLIGENCE = "Intelligence"
-
-@dataclass
-class DicePool:
-    """Represents a dice pool like 2D6 or D3+D10"""
-    dice: List[DiceType]
-    
-    def roll(self) -> int:
-        """Roll all dice in the pool and return the sum"""
-        return sum(random.randint(1, die.value) for die in self.dice)
-    
-    def __str__(self) -> str:
-        if not self.dice:
-            return "0"
-        
-        # Count occurrences of each die type
-        counts = {}
-        for die in self.dice:
-            counts[die] = counts.get(die, 0) + 1
-        
-        # Format as "2D6+D10" etc.
-        parts = []
-        for die_type, count in sorted(counts.items(), key=lambda x: x[0].value):
-            if count == 1:
-                parts.append(f"D{die_type.value}")
-            else:
-                parts.append(f"{count}D{die_type.value}")
-        
-        return "+".join(parts)
-
-@dataclass
-class Subordinate:
-    """Represents a subordinate with their skills and needs"""
-    name: str
-    logistics: DicePool
-    security: DicePool
-    intelligence: DicePool
-    need: Optional[str] = None
-    need_fulfilled: bool = False
-    current_task: Optional[str] = None
-    
-    def get_stat(self, area: GovernanceArea) -> DicePool:
-        """Get the dice pool for a specific governance area"""
-        if area == GovernanceArea.LOGISTICS:
-            return self.logistics
-        elif area == GovernanceArea.SECURITY:
-            return self.security
-        else:
-            return self.intelligence
-    
-    def roll_for_area(self, area: GovernanceArea) -> int:
-        """Roll dice for a specific governance area"""
-        base_roll = self.get_stat(area).roll()
-        bonus = 2 if self.need_fulfilled else 0
-        return base_roll + bonus
-
-@dataclass
-class Task:
-    """Represents a task that can be assigned to subordinates"""
-    name: str
-    area: GovernanceArea
-    progress: int = 0
-    required_progress: int = 10
-    assigned_subordinate: Optional[str] = None
-    description: str = ""
-    duration_ticks: Optional[int] = None
-    
-    @property
-    def is_complete(self) -> bool:
-        return self.progress >= self.required_progress
-    
-    @property
-    def completion_percentage(self) -> float:
-        return min(100.0, (self.progress / self.required_progress) * 100)
-
-@dataclass
-class Resources:
-    """Tracks the three main resource types"""
-    materials: int = 50
-    biologics: int = 30
-    minerals: int = 20
-    
-    def add(self, resource_type: ResourceType, amount: int):
-        """Add resources of a specific type"""
-        if resource_type == ResourceType.MATERIALS:
-            self.materials += amount
-        elif resource_type == ResourceType.BIOLOGICS:
-            self.biologics += amount
-        elif resource_type == ResourceType.MINERALS:
-            self.minerals += amount
-    
-    def subtract(self, resource_type: ResourceType, amount: int) -> bool:
-        """Subtract resources if available, return True if successful"""
-        if resource_type == ResourceType.MATERIALS:
-            if self.materials >= amount:
-                self.materials -= amount
-                return True
-        elif resource_type == ResourceType.BIOLOGICS:
-            if self.biologics >= amount:
-                self.biologics -= amount
-                return True
-        elif resource_type == ResourceType.MINERALS:
-            if self.minerals >= amount:
-                self.minerals -= amount
-                return True
-        return False
-
-class GameState:
-    """Main game state manager"""
-    
-    def __init__(self):
-        self.day = 1
-        self.resources = Resources()
-        self.subordinates = self._generate_starting_subordinates()
-        self.tasks = []
-        self.completed_tasks = []
-        self.events_log = []
-        self.imperial_tribute_due = 7  # Days until tribute is due
-        self.imperial_tribute_amount = 30  # Materials needed
-        
-    def _generate_starting_subordinates(self) -> List[Subordinate]:
-        """Generate starting subordinates with random stats"""
-        names = [
-            "Administrator Vex", "Strategos Korrath", "Courtier Illyana",
-            "Overseer Grimm", "Captain Nerys"
-        ]
-        
-        subordinates = []
-        for name in names[:3]:  # Start with 3 subordinates
-            # Generate random dice pools
-            logistics = DicePool([random.choice(list(DiceType))])
-            security = DicePool([random.choice(list(DiceType))])
-            intelligence = DicePool([random.choice(list(DiceType))])
-            
-            # Sometimes add a second die
-            if random.random() < 0.3:
-                logistics.dice.append(random.choice(list(DiceType)))
-            if random.random() < 0.3:
-                security.dice.append(random.choice(list(DiceType)))
-            if random.random() < 0.3:
-                intelligence.dice.append(random.choice(list(DiceType)))
-            
-            # Random need
-            needs = [
-                "Luxurious quarters", "Rare spices", "Combat stimulants",
-                "Information network access", "Personal guard detail", None
-            ]
-            need = random.choice(needs)
-            
-            subordinates.append(Subordinate(name, logistics, security, intelligence, need))
-        
-        return subordinates
-    
-    def add_task(
-        self,
-        name: str,
-        area: GovernanceArea,
-        required_progress: int = 10,
-        description: str = "",
-        duration_ticks: Optional[int] = None,
-    ):
-        """Add a task. Duration-based tasks advance once per tick; skill-based tasks roll for progress."""
-        task = Task(
-            name,
-            area,
-            required_progress=duration_ticks if duration_ticks is not None else required_progress,
-            description=description,
-            duration_ticks=duration_ticks,
-        )
-        self.tasks.append(task)
-    
-    def assign_subordinate_to_task(self, subordinate_name: str, task_name: str) -> bool:
-        """Assign an available subordinate to an unassigned task."""
-        subordinate = next((s for s in self.subordinates if s.name == subordinate_name), None)
-        task = next((t for t in self.tasks if t.name == task_name and not t.is_complete), None)
-        if subordinate is None or task is None:
-            return False
-        if subordinate.current_task and subordinate.current_task != task_name:
-            return False
-        if task.assigned_subordinate and task.assigned_subordinate != subordinate_name:
-            return False
-        subordinate.current_task = task_name
-        task.assigned_subordinate = subordinate_name
-        return True
-
-    def advance_tick(self):
-        """Advance the game by one day"""
-        self.day += 1
-        self.imperial_tribute_due -= 1
-        
-        # Process tasks
-        for task in self.tasks:
-            if task.assigned_subordinate and not task.is_complete:
-                subordinate = next(
-                    (s for s in self.subordinates if s.name == task.assigned_subordinate),
-                    None,
-                )
-                if subordinate is None:
-                    task.assigned_subordinate = None
-                    self.events_log.append(
-                        f"Day {self.day}: Task '{task.name}' paused because its assigned subordinate is missing."
-                    )
-                    continue
-
-                progress = 1 if task.duration_ticks is not None else subordinate.roll_for_area(task.area)
-                task.progress = min(task.required_progress, task.progress + progress)
-                self.events_log.append(
-                    f"Day {self.day}: {subordinate.name} made {progress} progress on {task.name}"
-                )
-
-                if task.is_complete:
-                    self.completed_tasks.append(task)
-                    subordinate.current_task = None
-                    task.assigned_subordinate = None
-                    self.events_log.append(f"Day {self.day}: Task '{task.name}' completed!")
-
-        # Remove completed tasks
-        self.tasks = [t for t in self.tasks if not t.is_complete]
-        
-        # Resource generation (basic)
-        self.resources.add(ResourceType.MATERIALS, random.randint(1, 3))
-        self.resources.add(ResourceType.BIOLOGICS, random.randint(1, 2))
-        self.resources.add(ResourceType.MINERALS, random.randint(0, 2))
-        
-        # Check imperial tribute
-        if self.imperial_tribute_due <= 0:
-            self._handle_imperial_tribute()
-        
-        # Random events (placeholder)
-        if random.random() < 0.1:
-            self._generate_random_event()
-    
-    def _handle_imperial_tribute(self):
-        """Handle imperial tribute payment"""
-        if self.resources.materials >= self.imperial_tribute_amount:
-            self.resources.subtract(ResourceType.MATERIALS, self.imperial_tribute_amount)
-            self.events_log.append(f"Day {self.day}: Imperial tribute of {self.imperial_tribute_amount} Materials paid.")
-            self.imperial_tribute_due = 30  # Next tribute in 30 days
-        else:
-            self.events_log.append(f"Day {self.day}: WARNING: Failed to pay Imperial tribute! Consequences incoming...")
-            self.imperial_tribute_due = 7  # Grace period
-    
-    def _generate_random_event(self):
-        """Generate a random event"""
-        events = [
-            "Asteroid mining yields extra minerals!",
-            "Food riots in the lower sectors - biologics consumed.",
-            "Equipment malfunction - materials needed for repairs.",
-            "Merchant convoy arrives with trade opportunities.",
-            "Heretic cell discovered in the manufacturing district."
-        ]
-        
-        event = random.choice(events)
-        self.events_log.append(f"Day {self.day}: {event}")
-        
-        # Apply event effects (simplified)
-        if "minerals" in event:
-            self.resources.add(ResourceType.MINERALS, random.randint(3, 8))
-        elif "biologics consumed" in event:
-            self.resources.subtract(ResourceType.BIOLOGICS, random.randint(5, 10))
-        elif "materials needed" in event:
-            self.resources.subtract(ResourceType.MATERIALS, random.randint(3, 7))
+from .simulation import GameState, add_starting_tasks
 
 class GDSAGui:
     """Main GUI class for the Grimdark System Admin game"""
@@ -297,7 +20,7 @@ class GDSAGui:
         
         # Automation controls
         self.is_running = False
-        self.current_speed = "Paused"
+        self.current_speed = "Normal"  # Speed used when Play is pressed; the game starts paused
         self.speed_intervals = {
             "Slow": 2000,      # 2 seconds per tick
             "Normal": 1000,    # 1 second per tick
@@ -313,19 +36,8 @@ class GDSAGui:
         
     def _initialize_game_tasks(self):
         """Add starting tasks to the game"""
-        self.game.add_task("Improve Mining Operations", GovernanceArea.LOGISTICS, 15, 
-                          "Increase mineral extraction efficiency")
-        self.game.add_task("Security Patrol Schedule", GovernanceArea.SECURITY, 12,
-                          "Organize patrols to maintain order")
-        self.game.add_task("Noble Relations", GovernanceArea.INTELLIGENCE, 20,
-                          "Gather intelligence on local noble houses")
-        self.game.add_task(
-            "Test Action: Administrative Audit",
-            GovernanceArea.INTELLIGENCE,
-            duration_ticks=5,
-            description="Development test: completes after exactly five simulation ticks.",
-        )
-    
+        add_starting_tasks(self.game)
+
     def _setup_styles(self):
         """Setup ttk styles for dark theme"""
         self.style = ttk.Style()
@@ -561,9 +273,16 @@ class GDSAGui:
     
     def _update_resources(self):
         """Update resources display"""
-        self.material_label.config(text=f"Materials: {self.game.resources.materials}")
-        self.biologics_label.config(text=f"Biologics: {self.game.resources.biologics}")
-        self.minerals_label.config(text=f"Minerals: {self.game.resources.minerals}")
+        resources = self.game.resources
+        for label, name, amount in (
+            (self.material_label, "Materials", resources.materials),
+            (self.biologics_label, "Biologics", resources.biologics),
+            (self.minerals_label, "Minerals", resources.minerals),
+        ):
+            text = f"{name}: {amount}"
+            if amount < 0:
+                text += " ⚠️ DEFICIT"
+            label.config(text=text)
     
     def _update_subordinates(self):
         """Update subordinates display"""
@@ -668,9 +387,13 @@ class GDSAGui:
         self._update_display()
         
         # Show any urgent messages
-        if self.game.imperial_tribute_due <= 0:
-            if self.game.resources.materials < self.game.imperial_tribute_amount:
-                messagebox.showwarning("Imperial Tribute", "Warning: Insufficient materials for Imperial tribute!")
+        if self.game.tribute_outcome == "paid":
+            messagebox.showinfo(
+                "Imperial Tribute",
+                f"Imperial tribute of {self.game.imperial_tribute_amount} Materials has been paid.",
+            )
+        elif self.game.tribute_outcome == "failed":
+            messagebox.showwarning("Imperial Tribute", "Warning: Insufficient materials for Imperial tribute!")
     
     def _assign_task(self):
         """Assign a subordinate to a task"""
@@ -758,7 +481,7 @@ class GDSAGui:
         if self.is_running:
             self.speed_indicator.config(text=f"Speed: {self.current_speed}")
         else:
-            self.speed_indicator.config(text="Speed: Paused")
+            self.speed_indicator.config(text=f"Speed: Paused ({self.current_speed})")
         
         # Update speed button styles (highlight current speed)
         speed_buttons = {
@@ -773,19 +496,3 @@ class GDSAGui:
                 button.config(state='disabled')
             else:
                 button.config(state='normal')
-
-def main():
-    """Main function to run the GUI"""
-    root = tk.Tk()
-    app = GDSAGui(root)
-    
-    # Ensure automation stops when window is closed
-    def on_closing():
-        app._stop_automation()
-        root.destroy()
-    
-    root.protocol("WM_DELETE_WINDOW", on_closing)
-    root.mainloop()
-
-if __name__ == "__main__":
-    main()

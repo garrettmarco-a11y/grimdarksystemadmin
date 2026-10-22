@@ -7,7 +7,7 @@
 - [x] Preserve the working Python/Tkinter version.
 - [x] Establish project instructions and documentation.
 - [x] Add regression tests for the basic task lifecycle.
-- [ ] Initialize Git and create the remote repository.
+- [x] Initialize Git and create the remote repository.
 - [ ] Confirm the project launches from the documented path on the development machine.
 
 ## Stage A — Operational prototype
@@ -31,9 +31,9 @@ Current status: the core task behavior is implemented in the single-file prototy
 Proposed first feature: a simple food inventory or food-production action. Keep it narrow: define the resource, task cost/output, completion effect, display, and tests. Do not implement a complete supply-chain simulation in this stage.
 
 Entry criteria:
-- Stage A tests pass.
-- Simulation logic is separated from GUI code enough to test without a display.
-- Current resource behavior is documented.
+- [x] Stage A tests pass.
+- [x] Simulation logic is separated from GUI code enough to test without a display.
+- [x] Current resource behavior is documented (`docs/GAME_DESIGN.md`, "Current rules and values").
 
 ## Stage C — Interconnected pressures
 
