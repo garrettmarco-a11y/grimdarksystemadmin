@@ -86,10 +86,12 @@ class GameStateTaskTests(unittest.TestCase):
         state.add_task("Skill Task", GovernanceArea.LOGISTICS, required_progress=100)
         self.assertTrue(state.assign_subordinate_to_task(agent.name, "Skill Task"))
 
-        with patch.object(agent, "roll_for_area", return_value=4):
+        with patch.object(agent, "roll_for_area", return_value=4) as roll:
             with patch("gdsa.simulation.random.random", return_value=1.0):
-                state.advance_tick()
+                for _ in range(7):
+                    state.advance_tick()
 
+        roll.assert_called_once_with(GovernanceArea.LOGISTICS)
         self.assertEqual(state.tasks[0].progress, 4)
 
     def test_missing_agent_pauses_task_without_crashing(self):

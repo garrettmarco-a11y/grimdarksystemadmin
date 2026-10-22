@@ -22,13 +22,15 @@
 - Completion is logged and the agent becomes available again.
 - The GUI continues to launch and display the state correctly.
 
-Current status: the core task behavior is implemented in the single-file prototype. Repository setup and stronger regression coverage remain.
+Current status: implemented and covered by tests in the `gdsa` package.
 
 ## Stage B — Meaningful administration
 
 **Goal:** Add one resource-linked task that makes an administrative decision matter.
 
-Proposed first feature: a simple food inventory or food-production action. Keep it narrow: define the resource, task cost/output, completion effect, display, and tests. Do not implement a complete supply-chain simulation in this stage.
+First feature (implemented): daily food upkeep drawn from Biologics, plus a repeatable Logistics `Hydroponics Shift` action that yields Biologics. Skill rolls now happen weekly. Values are first-pass and documented in `GAME_DESIGN.md`. Do not implement a complete supply-chain simulation in this stage.
+
+Remaining for Stage B: play-test and tune the food values; decide what a food deficit does (currently nothing beyond the display).
 
 Entry criteria:
 - [x] Stage A tests pass.

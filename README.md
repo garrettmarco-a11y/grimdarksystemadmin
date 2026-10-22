@@ -7,7 +7,7 @@ This repository is being organized for incremental development with Git and a co
 ## Current status
 
 - Working baseline: the existing single-file Python/Tkinter prototype.
-- Simulation includes subordinate skill dice, task assignment and progress, resource inventories, daily ticks, tribute, and random events.
+- Simulation includes subordinate skill dice (rolled weekly), task assignment and progress, resource inventories, daily ticks, daily food upkeep, a repeatable food-production action, tribute, and random events.
 - A deterministic five-tick `Test Action: Administrative Audit` is included to validate the task lifecycle.
 - Simulation logic lives in a Tkinter-free package (`src/gdsa/`), so the tests run without a display or a Tkinter install.
 - Automated tests cover the simulation rules; the GUI is not covered by automated UI tests and should be checked by launching it.

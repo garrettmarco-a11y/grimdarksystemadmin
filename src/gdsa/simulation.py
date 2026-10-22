@@ -1,9 +1,15 @@
 """Game state and simulation rules. Must not depend on Tkinter."""
 
 import random
-from typing import List, Optional
+from typing import Dict, List, Optional
+
+# Biologics eaten by the hive each tick. Baseline infrastructure produces 1-3 Biologics
+# per tick, so without intervention the food supply barely holds and slowly erodes
+# under random events.
+FOOD_UPKEEP_PER_TICK = 2
 
 from .models import (
+    SKILL_ROLL_INTERVAL_TICKS,
     DicePool,
     DiceType,
     GovernanceArea,
@@ -67,14 +73,19 @@ class GameState:
         required_progress: int = 10,
         description: str = "",
         duration_ticks: Optional[int] = None,
+        rewards: Optional[Dict[ResourceType, int]] = None,
+        repeatable: bool = False,
     ):
-        """Add a task. Duration-based tasks advance once per tick; skill-based tasks roll for progress."""
+        """Add a task. Duration-based tasks advance once per tick; skill-based tasks roll
+        for progress once every SKILL_ROLL_INTERVAL_TICKS ticks of work."""
         task = Task(
             name,
             area,
             required_progress=duration_ticks if duration_ticks is not None else required_progress,
             description=description,
             duration_ticks=duration_ticks,
+            rewards=dict(rewards or {}),
+            repeatable=repeatable,
         )
         self.tasks.append(task)
     
@@ -99,6 +110,7 @@ class GameState:
         self.tribute_outcome = None
         
         # Process tasks
+        reoffered = []
         for task in self.tasks:
             if task.assigned_subordinate and not task.is_complete:
                 subordinate = next(
@@ -112,7 +124,13 @@ class GameState:
                     )
                     continue
 
-                progress = 1 if task.duration_ticks is not None else subordinate.roll_for_area(task.area)
+                task.days_worked += 1
+                if task.is_skill_based:
+                    if task.days_worked % SKILL_ROLL_INTERVAL_TICKS != 0:
+                        continue  # Skill dice are rolled once per week of work
+                    progress = subordinate.roll_for_area(task.area)
+                else:
+                    progress = 1
                 task.progress = min(task.required_progress, task.progress + progress)
                 self.events_log.append(
                     f"Day {self.day}: {subordinate.name} made {progress} progress on {task.name}"
@@ -123,14 +141,24 @@ class GameState:
                     subordinate.current_task = None
                     task.assigned_subordinate = None
                     self.events_log.append(f"Day {self.day}: Task '{task.name}' completed!")
+                    for resource_type, amount in task.rewards.items():
+                        self.resources.add(resource_type, amount)
+                        self.events_log.append(
+                            f"Day {self.day}: {task.name} yields {amount} {resource_type.value}."
+                        )
+                    if task.repeatable:
+                        reoffered.append(self._fresh_copy(task))
 
-        # Remove completed tasks
-        self.tasks = [t for t in self.tasks if not t.is_complete]
+        # Remove completed tasks; repeatable ones are offered again
+        self.tasks = [t for t in self.tasks if not t.is_complete] + reoffered
         
-        # Resource generation (basic)
+        # Resource generation (basic infrastructure)
         self.resources.add(ResourceType.MATERIALS, random.randint(1, 3))
-        self.resources.add(ResourceType.BIOLOGICS, random.randint(1, 2))
+        self.resources.add(ResourceType.BIOLOGICS, random.randint(1, 3))
         self.resources.add(ResourceType.MINERALS, random.randint(0, 2))
+
+        # The hive eats; shortfalls become a deficit
+        self.resources.deduct(ResourceType.BIOLOGICS, FOOD_UPKEEP_PER_TICK)
         
         # Check imperial tribute
         if self.imperial_tribute_due <= 0:
@@ -140,6 +168,19 @@ class GameState:
         if random.random() < 0.1:
             self._generate_random_event()
     
+    @staticmethod
+    def _fresh_copy(task: Task) -> Task:
+        """An unstarted, unassigned copy of a repeatable task"""
+        return Task(
+            task.name,
+            task.area,
+            required_progress=task.required_progress,
+            description=task.description,
+            duration_ticks=task.duration_ticks,
+            rewards=dict(task.rewards),
+            repeatable=True,
+        )
+
     def _handle_imperial_tribute(self):
         """Handle imperial tribute payment"""
         if self.resources.materials >= self.imperial_tribute_amount:
@@ -187,4 +228,12 @@ def add_starting_tasks(state: GameState):
         GovernanceArea.INTELLIGENCE,
         duration_ticks=5,
         description="Development test: completes after exactly five simulation ticks.",
+    )
+    state.add_task(
+        "Hydroponics Shift",
+        GovernanceArea.LOGISTICS,
+        12,
+        "Drive the vat-crews of the lower hive to bring in an extra harvest. Yields 20 Biologics.",
+        rewards={ResourceType.BIOLOGICS: 20},
+        repeatable=True,
     )

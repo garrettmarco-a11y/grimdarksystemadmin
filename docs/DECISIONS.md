@@ -6,7 +6,7 @@ This file distinguishes current working decisions from matters that still need d
 
 - **Implementation platform:** Continue with the surviving Python/Tkinter version. Rebuilding in GameMaker is not required.
 - **Development style:** Build a small complete playable loop, then add systems in stages.
-- **Time model:** One tick represents approximately one local day.
+- **Time model:** One tick represents approximately one local day. Subordinates roll skill dice once per week (7 ticks) of work on a task.
 - **Governance domains:** Logistics, Security, Intelligence.
 - **Task model:** Agents work on assigned tasks over multiple ticks; task completion should report the outcome and free the agent.
 - **Current test action:** `Test Action: Administrative Audit`, a duration-based five-tick task.
@@ -14,12 +14,19 @@ This file distinguishes current working decisions from matters that still need d
 - **Code layout:** `src/gdsa/` package with Tkinter-free `models.py`/`simulation.py`, `ui.py`, and `app.py`; the project lives at the repository root.
 - **Automation default:** The game starts paused with Normal speed selected, so the player can set up before time runs.
 - **Tribute notice:** A popup appears on the tick tribute falls due, whether it was paid or not.
-- **Resource deficits:** Event losses may drive stock below zero. Tribute is still paid only from available Materials.
+- **Resource deficits:** Event losses and food upkeep may drive stock below zero. Tribute is still paid only from available Materials.
+- **Actions:** Skill-based by default (a few may be time-based), free for now, and usually repeatable.
+- **Food:** A sub-type of Biologics, tracked as Biologics for now. The hive eats a flat 2 per tick; baseline infrastructure produces 1–3 per tick, so it is just barely stable.
+- **First food action:** `Hydroponics Shift` (Logistics, 12 progress, +20 Biologics, repeatable).
 - **Coding-agent behavior:** Small changes, tests, diff review, and no unrequested commits/pushes.
 
 ## Not yet finalized
 
-- The long-term food and resource economy, including production rates and consumption.
+- The long-term food and resource economy beyond the flat upkeep, including whether food becomes a separate tracked sub-resource and whether upkeep scales with population.
+- Districts and efficiency: how repeated actions and investment change a district's output, and what "shaking up stability" risks look like.
+- Whether weekly skill rolls should align to a shared calendar week rather than counting from each assignment (current behavior).
+- Whether the existing one-off starting tasks (mining, patrols, noble relations) should become repeatable and/or gain completion effects.
+- Exact Hydroponics yield and difficulty, and the food-upkeep rate. These are first-pass values to tune through play.
 - How population, contentment, security, and ideology interact.
 - Exact consequences and cadence for Imperial tribute.
 - The final approach to saves and loading.

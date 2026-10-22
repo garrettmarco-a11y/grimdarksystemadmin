@@ -1,9 +1,12 @@
 """Core data types: enums, dice pools, subordinates, tasks, and resources."""
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional
+from typing import Dict, List, Optional
+
+# Skill-based tasks: the assigned subordinate rolls once per this many ticks (days) of work.
+SKILL_ROLL_INTERVAL_TICKS = 7
 
 class DiceType(Enum):
     D3 = 3
@@ -84,6 +87,18 @@ class Task:
     assigned_subordinate: Optional[str] = None
     description: str = ""
     duration_ticks: Optional[int] = None
+    rewards: Dict["ResourceType", int] = field(default_factory=dict)  # Granted on completion
+    repeatable: bool = False  # A fresh copy is offered again after completion
+    days_worked: int = 0  # Ticks of work by an assigned subordinate
+    
+    @property
+    def is_skill_based(self) -> bool:
+        return self.duration_ticks is None
+    
+    @property
+    def days_until_roll(self) -> int:
+        """Ticks of work remaining before the next skill roll"""
+        return SKILL_ROLL_INTERVAL_TICKS - self.days_worked % SKILL_ROLL_INTERVAL_TICKS
     
     @property
     def is_complete(self) -> bool:

@@ -3,7 +3,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 
-from .simulation import GameState, add_starting_tasks
+from .simulation import FOOD_UPKEEP_PER_TICK, GameState, add_starting_tasks
 
 class GDSAGui:
     """Main GUI class for the Grimdark System Admin game"""
@@ -164,6 +164,9 @@ class GDSAGui:
         
         self.minerals_label = ttk.Label(self.resources_frame, text="Minerals: 20", font=('Arial', 12))
         self.minerals_label.pack(anchor=tk.W, pady=5)
+        
+        upkeep_label = ttk.Label(self.resources_frame, text=f"Hive food upkeep: {FOOD_UPKEEP_PER_TICK} Biologics per day")
+        upkeep_label.pack(anchor=tk.W, pady=(15, 5))
     
     def _create_subordinates_tab(self):
         """Create the subordinates tab"""
@@ -348,7 +351,11 @@ class GDSAGui:
             
             # Assignment
             if task.assigned_subordinate:
-                assigned_label = ttk.Label(task_frame, text=f"Assigned to: {task.assigned_subordinate}")
+                assigned_text = f"Assigned to: {task.assigned_subordinate}"
+                if task.is_skill_based:
+                    days = task.days_until_roll
+                    assigned_text += f" (next report in {days} day{'s' if days != 1 else ''})"
+                assigned_label = ttk.Label(task_frame, text=assigned_text)
                 assigned_label.pack(anchor=tk.W)
             
             # Description

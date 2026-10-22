@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from gdsa.models import (  # noqa: E402
+    SKILL_ROLL_INTERVAL_TICKS,
     DicePool,
     DiceType,
     GovernanceArea,
@@ -16,7 +17,7 @@ from gdsa.models import (  # noqa: E402
     Resources,
     Subordinate,
 )
-from gdsa.simulation import GameState, add_starting_tasks  # noqa: E402
+from gdsa.simulation import FOOD_UPKEEP_PER_TICK, GameState, add_starting_tasks  # noqa: E402
 
 
 def quiet_tick(state):
@@ -71,9 +72,13 @@ class StartingStateTests(unittest.TestCase):
                 ("Security Patrol Schedule", GovernanceArea.SECURITY, 12, None, 0, None),
                 ("Noble Relations", GovernanceArea.INTELLIGENCE, 20, None, 0, None),
                 ("Test Action: Administrative Audit", GovernanceArea.INTELLIGENCE, 5, 5, 0, None),
+                ("Hydroponics Shift", GovernanceArea.LOGISTICS, 12, None, 0, None),
             ],
         )
         self.assertEqual(state.tasks[0].description, "Increase mineral extraction efficiency")
+        self.assertEqual([t.repeatable for t in state.tasks], [False, False, False, False, True])
+        self.assertEqual(state.tasks[4].rewards, {ResourceType.BIOLOGICS: 20})
+        self.assertTrue(all(t.rewards == {} for t in state.tasks[:4]))
 
 
 class DiceTests(unittest.TestCase):
@@ -116,6 +121,87 @@ class TaskRuleTests(unittest.TestCase):
         self.assertEqual(state.tasks[0].completion_percentage, 100.0)
 
 
+class SkillTaskTimingTests(unittest.TestCase):
+    def make_assigned_task(self, **task_kwargs):
+        state = GameState()
+        agent = state.subordinates[0]
+        state.add_task("Work", GovernanceArea.LOGISTICS, **task_kwargs)
+        self.assertTrue(state.assign_subordinate_to_task(agent.name, "Work"))
+        return state, agent
+
+    def test_skill_dice_roll_once_per_week_of_work(self):
+        self.assertEqual(SKILL_ROLL_INTERVAL_TICKS, 7)
+        state, agent = self.make_assigned_task(required_progress=100)
+        with patch.object(agent, "roll_for_area", return_value=3) as roll:
+            for day in range(1, 15):
+                quiet_tick(state)
+                self.assertEqual(roll.call_count, day // 7)
+        self.assertEqual(state.tasks[0].progress, 6)
+        self.assertEqual(
+            [e for e in state.events_log if "progress" in e],
+            [f"Day 8: {agent.name} made 3 progress on Work", f"Day 15: {agent.name} made 3 progress on Work"],
+        )
+
+    def test_days_until_roll_counts_down(self):
+        state, _agent = self.make_assigned_task(required_progress=100)
+        self.assertEqual(state.tasks[0].days_until_roll, 7)
+        for expected in (6, 5, 4, 3, 2, 1, 7):
+            quiet_tick(state)
+            self.assertEqual(state.tasks[0].days_until_roll, expected)
+
+    def test_unassigned_task_does_not_accumulate_work(self):
+        state = GameState()
+        state.add_task("Idle", GovernanceArea.LOGISTICS)
+        for _ in range(10):
+            quiet_tick(state)
+        self.assertEqual(state.tasks[0].days_worked, 0)
+        self.assertEqual(state.tasks[0].progress, 0)
+
+
+class TaskCompletionTests(unittest.TestCase):
+    def complete(self, state, agent, roll=50):
+        with patch.object(agent, "roll_for_area", return_value=roll):
+            for _ in range(SKILL_ROLL_INTERVAL_TICKS):
+                quiet_tick(state)
+
+    def test_rewards_granted_on_completion(self):
+        state = GameState()
+        agent = state.subordinates[0]
+        state.add_task("Harvest", GovernanceArea.LOGISTICS, 12, rewards={ResourceType.BIOLOGICS: 20})
+        state.assign_subordinate_to_task(agent.name, "Harvest")
+        self.complete(state, agent)
+        upkeep = SKILL_ROLL_INTERVAL_TICKS * FOOD_UPKEEP_PER_TICK
+        self.assertEqual(state.resources.biologics, 30 + 20 - upkeep)
+        self.assertIn("Day 8: Harvest yields 20 Biologics.", state.events_log)
+
+    def test_repeatable_task_is_offered_again_fresh(self):
+        state = GameState()
+        agent = state.subordinates[0]
+        state.add_task("Harvest", GovernanceArea.LOGISTICS, 12,
+                       rewards={ResourceType.BIOLOGICS: 20}, repeatable=True)
+        state.assign_subordinate_to_task(agent.name, "Harvest")
+        self.complete(state, agent)
+        self.assertEqual([t.name for t in state.completed_tasks], ["Harvest"])
+        self.assertEqual(len(state.tasks), 1)
+        again = state.tasks[0]
+        self.assertIsNot(again, state.completed_tasks[0])
+        self.assertEqual(
+            (again.name, again.progress, again.days_worked, again.assigned_subordinate, again.repeatable),
+            ("Harvest", 0, 0, None, True),
+        )
+        self.assertEqual(again.rewards, {ResourceType.BIOLOGICS: 20})
+        self.assertIsNone(agent.current_task)
+        self.assertTrue(state.assign_subordinate_to_task(agent.name, "Harvest"))
+
+    def test_non_repeatable_task_is_not_offered_again(self):
+        state = GameState()
+        agent = state.subordinates[0]
+        state.add_task("Once", GovernanceArea.LOGISTICS, 5)
+        state.assign_subordinate_to_task(agent.name, "Once")
+        self.complete(state, agent)
+        self.assertEqual(state.tasks, [])
+
+
 class ResourceTests(unittest.TestCase):
     def test_add_and_subtract(self):
         resources = Resources()
@@ -141,11 +227,23 @@ class ResourceTests(unittest.TestCase):
         with patch("gdsa.simulation.random.random", return_value=1.0):
             with patch("gdsa.simulation.random.randint", return_value=1) as randint:
                 state.advance_tick()
-        self.assertEqual(randint.call_args_list, [call(1, 3), call(1, 2), call(0, 2)])
+        self.assertEqual(randint.call_args_list, [call(1, 3), call(1, 3), call(0, 2)])
         self.assertEqual(
             (state.resources.materials, state.resources.biologics, state.resources.minerals),
-            (51, 31, 21),
+            (51, 31 - FOOD_UPKEEP_PER_TICK, 21),
         )
+
+    def test_hive_eats_biologics_each_tick(self):
+        self.assertEqual(FOOD_UPKEEP_PER_TICK, 2)
+        state = GameState()
+        quiet_tick(state)
+        self.assertEqual(state.resources.biologics, 28)
+
+    def test_food_upkeep_can_push_biologics_into_deficit(self):
+        state = GameState()
+        state.resources.biologics = 1
+        quiet_tick(state)
+        self.assertEqual(state.resources.biologics, -1)
 
 
 class TributeTests(unittest.TestCase):
