@@ -28,7 +28,9 @@ Current status: the core task behavior is implemented in the single-file prototy
 
 **Goal:** Add one resource-linked task that makes an administrative decision matter.
 
-Proposed first feature: a simple food inventory or food-production action. Keep it narrow: define the resource, task cost/output, completion effect, display, and tests. Do not implement a complete supply-chain simulation in this stage.
+First feature (implemented): `Requisition Food Stores`, a one-time, 5-tick Logistics task that adds 10 Biologics (food) on completion. No consumption, starvation, persistent bonuses, or supply chains. Do not implement a complete supply-chain simulation in this stage.
+
+Remaining for Stage B: decide the next food step (repeatable or skill-based production, consumption) and when to retire the Administrative Audit test action.
 
 Entry criteria:
 - [x] Stage A tests pass.

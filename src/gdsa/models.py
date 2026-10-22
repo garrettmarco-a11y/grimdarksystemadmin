@@ -1,9 +1,9 @@
 """Core data types: enums, dice pools, subordinates, tasks, and resources."""
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 class DiceType(Enum):
     D3 = 3
@@ -84,6 +84,7 @@ class Task:
     assigned_subordinate: Optional[str] = None
     description: str = ""
     duration_ticks: Optional[int] = None
+    rewards: Dict["ResourceType", int] = field(default_factory=dict)  # Granted once, on completion
     
     @property
     def is_complete(self) -> bool:

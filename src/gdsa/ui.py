@@ -159,7 +159,7 @@ class GDSAGui:
         self.material_label = ttk.Label(self.resources_frame, text="Materials: 50", font=('Arial', 12))
         self.material_label.pack(anchor=tk.W, pady=5)
         
-        self.biologics_label = ttk.Label(self.resources_frame, text="Biologics: 30", font=('Arial', 12))
+        self.biologics_label = ttk.Label(self.resources_frame, text="Biologics (food): 30", font=('Arial', 12))
         self.biologics_label.pack(anchor=tk.W, pady=5)
         
         self.minerals_label = ttk.Label(self.resources_frame, text="Minerals: 20", font=('Arial', 12))
@@ -276,7 +276,7 @@ class GDSAGui:
         resources = self.game.resources
         for label, name, amount in (
             (self.material_label, "Materials", resources.materials),
-            (self.biologics_label, "Biologics", resources.biologics),
+            (self.biologics_label, "Biologics (food)", resources.biologics),
             (self.minerals_label, "Minerals", resources.minerals),
         ):
             text = f"{name}: {amount}"

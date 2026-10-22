@@ -15,6 +15,8 @@ This file distinguishes current working decisions from matters that still need d
 - **Automation default:** The game starts paused with Normal speed selected, so the player can set up before time runs.
 - **Tribute notice:** A popup appears on the tick tribute falls due, whether it was paid or not.
 - **Resource deficits:** Event losses may drive stock below zero. Tribute is still paid only from available Materials.
+- **Food (Stage B first step):** The existing Biologics inventory is the city's food supply. The internal resource type and event rules are unchanged.
+- **First food action:** `Requisition Food Stores`, a duration-based 5-tick task granting a one-time +10 Biologics on completion. The Administrative Audit test action stays until this loop is verified.
 - **Coding-agent behavior:** Small changes, tests, diff review, and no unrequested commits/pushes.
 
 ## Not yet finalized
@@ -23,6 +25,8 @@ This file distinguishes current working decisions from matters that still need d
 - How population, contentment, security, and ideology interact.
 - Exact consequences and cadence for Imperial tribute.
 - The final approach to saves and loading.
+- Whether food actions should become repeatable and/or skill-based, whether skill rolls should move to a weekly cadence, and whether the hive should consume food each tick. These were explored in an unmerged proposal (PR #2) and are deliberately excluded from this step.
+- When to retire the Administrative Audit test action.
 - Consequences of a resource deficit (currently none beyond the display marker), and whether other costs may draw into deficit.
 - Consequences of failing Imperial tribute (currently a log entry and a 7-day grace period).
 - Whether and how subordinate needs can be fulfilled. The +2 bonus exists in code but is unreachable; it may be changed.

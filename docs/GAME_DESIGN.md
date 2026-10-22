@@ -30,10 +30,14 @@ The current Python prototype includes:
 - Imperial tribute due timing and payment.
 - Placeholder random events.
 - A duration-based development test action, `Test Action: Administrative Audit`, which completes after five ticks and is used to verify assignment, progress, completion, and agent release.
+- A one-time food production action, `Requisition Food Stores`, which completes after five ticks and adds 10 Biologics.
 
 ### Current rules and values
 
 - **Start:** Day 1; Materials 50, Biologics 30, Minerals 20; three subordinates.
+- **Food:** Biologics serve as the hive's food supply. The UI labels them "Biologics (food)". There is no food consumption yet.
+- **Task rewards:** a task may grant resources once, on the tick it completes. No partial rewards are given, and a completed task leaves the task list, so it cannot pay out again.
+- **Requisition Food Stores:** Logistics, duration-based, 5 ticks (one progress per tick, completes on tick five), no cost, one-time, +10 Biologics on completion. It is logged as "<task> delivers 10 Biologics to the hive's stores." The reward is added in the task step of the tick, before normal generation.
 - **Tick order:** day advances, tasks progress, resources are generated, tribute is checked, then a random event may occur.
 - **Generation per tick:** Materials +1–3, Biologics +1–2, Minerals +0–2.
 - **Deficit:** Losses from events can push a stockpile below zero. The UI marks negative stock as a deficit. Generation continues to add normally. A deficit currently has no further consequence (see `DECISIONS.md`).
