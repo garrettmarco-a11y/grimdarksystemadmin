@@ -2,24 +2,13 @@
 
 ## One-time local setup
 
-1. Extract or place this folder where you keep development projects.
-2. Open a terminal in the repository root.
-3. Initialize Git:
+The repository is hosted on GitHub. Clone it and run the tests from the repository root:
 
-   ```bash
-   git init
-   git add .
-   git commit -m "chore: establish playable Python prototype"
-   ```
-
-4. Create an empty GitHub repository named `grimdark-system-admin` (or another chosen name). If creating it on GitHub, do not add a second README or license during creation if you intend to push this existing initial commit.
-5. Add the remote using the URL GitHub provides, then push the current branch. For example:
-
-   ```bash
-   git branch -M main
-   git remote add origin <your-repository-url>
-   git push -u origin main
-   ```
+```bash
+git clone <your-repository-url>
+cd <repository-folder>
+python -m unittest discover -s tests -v
+```
 
 Do not paste access tokens into source files or commit them.
 

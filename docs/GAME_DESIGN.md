@@ -31,6 +31,17 @@ The current Python prototype includes:
 - Placeholder random events.
 - A duration-based development test action, `Test Action: Administrative Audit`, which completes after five ticks and is used to verify assignment, progress, completion, and agent release.
 
+### Current rules and values
+
+- **Start:** Day 1; Materials 50, Biologics 30, Minerals 20; three subordinates.
+- **Tick order:** day advances, tasks progress, resources are generated, tribute is checked, then a random event may occur.
+- **Generation per tick:** Materials +1–3, Biologics +1–2, Minerals +0–2.
+- **Deficit:** Losses from events can push a stockpile below zero. The UI marks negative stock as a deficit. Generation continues to add normally. A deficit currently has no further consequence (see `DECISIONS.md`).
+- **Tribute:** 30 Materials, first due on day 8, then every 30 days after payment. It is paid only if Materials ≥ 30; tribute never creates a deficit. Failing logs a warning and sets a 7-day grace period, with no other consequence yet. On the tick tribute falls due, the GUI shows a popup: confirmation if paid, warning if not.
+- **Random events:** 10% chance per tick of one of five placeholder events. Asteroid mining +3–8 Minerals; food riots −5–10 Biologics; equipment malfunction −3–7 Materials; merchant convoy and heretic cell are log-only.
+- **Need bonus:** a subordinate with `need_fulfilled` adds +2 to rolls, but no current action fulfils needs, so the bonus is unreachable in play.
+- **Automation:** the game starts paused with Normal speed selected; Play runs at the selected speed (Slow 2s, Normal 1s, Fast 0.5s per tick).
+
 The current implementation is a prototype, not a complete or balanced game. Current values and random events should not automatically be treated as final design decisions.
 
 ## Design principles

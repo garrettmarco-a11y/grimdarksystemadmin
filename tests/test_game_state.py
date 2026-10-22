@@ -6,13 +6,8 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from grimdark_system_admin import (  # noqa: E402
-    DicePool,
-    DiceType,
-    GameState,
-    GovernanceArea,
-    Subordinate,
-)
+from gdsa.models import DicePool, DiceType, GovernanceArea, Subordinate  # noqa: E402
+from gdsa.simulation import GameState  # noqa: E402
 
 
 class GameStateTaskTests(unittest.TestCase):
@@ -43,7 +38,7 @@ class GameStateTaskTests(unittest.TestCase):
 
         # Random events and resource amounts are irrelevant to this test.
         with patch.object(state, "_generate_random_event"):
-            with patch("grimdark_system_admin.random.random", return_value=1.0):
+            with patch("gdsa.simulation.random.random", return_value=1.0):
                 for expected_progress in range(1, 5):
                     state.advance_tick()
                     self.assertEqual(state.completed_tasks, [])
@@ -92,7 +87,7 @@ class GameStateTaskTests(unittest.TestCase):
         self.assertTrue(state.assign_subordinate_to_task(agent.name, "Skill Task"))
 
         with patch.object(agent, "roll_for_area", return_value=4):
-            with patch("grimdark_system_admin.random.random", return_value=1.0):
+            with patch("gdsa.simulation.random.random", return_value=1.0):
                 state.advance_tick()
 
         self.assertEqual(state.tasks[0].progress, 4)
@@ -102,7 +97,7 @@ class GameStateTaskTests(unittest.TestCase):
         state.add_task("Orphaned Task", GovernanceArea.LOGISTICS, required_progress=100)
         state.tasks[0].assigned_subordinate = "Missing Agent"
 
-        with patch("grimdark_system_admin.random.random", return_value=1.0):
+        with patch("gdsa.simulation.random.random", return_value=1.0):
             state.advance_tick()
 
         self.assertIsNone(state.tasks[0].assigned_subordinate)
