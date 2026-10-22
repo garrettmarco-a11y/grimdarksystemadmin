@@ -1,7 +1,7 @@
 """Game state and simulation rules. Must not depend on Tkinter."""
 
 import random
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from .models import (
     DicePool,
@@ -67,14 +67,17 @@ class GameState:
         required_progress: int = 10,
         description: str = "",
         duration_ticks: Optional[int] = None,
+        rewards: Optional[Dict[ResourceType, int]] = None,
     ):
-        """Add a task. Duration-based tasks advance once per tick; skill-based tasks roll for progress."""
+        """Add a task. Duration-based tasks advance once per tick; skill-based tasks roll for progress.
+        Rewards are granted once, when the task completes."""
         task = Task(
             name,
             area,
             required_progress=duration_ticks if duration_ticks is not None else required_progress,
             description=description,
             duration_ticks=duration_ticks,
+            rewards=dict(rewards or {}),
         )
         self.tasks.append(task)
     
@@ -123,6 +126,11 @@ class GameState:
                     subordinate.current_task = None
                     task.assigned_subordinate = None
                     self.events_log.append(f"Day {self.day}: Task '{task.name}' completed!")
+                    for resource_type, amount in task.rewards.items():
+                        self.resources.add(resource_type, amount)
+                        self.events_log.append(
+                            f"Day {self.day}: {task.name} delivers {amount} {resource_type.value} to the hive's stores."
+                        )
 
         # Remove completed tasks
         self.tasks = [t for t in self.tasks if not t.is_complete]
@@ -187,4 +195,12 @@ def add_starting_tasks(state: GameState):
         GovernanceArea.INTELLIGENCE,
         duration_ticks=5,
         description="Development test: completes after exactly five simulation ticks.",
+    )
+    state.add_task(
+        "Requisition Food Stores",
+        GovernanceArea.LOGISTICS,
+        duration_ticks=5,
+        description="Commandeer nutrient-paste stocks from the agri-levels. "
+                    "After 5 days, adds 10 Biologics to the hive's food supply.",
+        rewards={ResourceType.BIOLOGICS: 10},
     )
