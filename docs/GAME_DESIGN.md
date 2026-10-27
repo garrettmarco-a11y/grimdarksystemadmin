@@ -31,13 +31,16 @@ The current Python prototype includes:
 - Placeholder random events.
 - A duration-based development test action, `Test Action: Administrative Audit`, which completes after five ticks and is used to verify assignment, progress, completion, and agent release.
 - A one-time food production action, `Requisition Food Stores`, which completes after five ticks and adds 10 Biologics.
+- A one-time, resource-cost food action, `Commission Emergency Food Convoy`, which costs 10 Materials on assignment, completes after five ticks and adds 20 Biologics.
 
 ### Current rules and values
 
 - **Start:** Day 1; Materials 50, Biologics 30, Minerals 20; three subordinates.
 - **Food:** Biologics serve as the hive's food supply. The UI labels them "Biologics (food)". There is no food consumption yet.
 - **Task rewards:** a task may grant resources once, on the tick it completes. No partial rewards are given, and a completed task leaves the task list, so it cannot pay out again.
+- **Task costs:** a task may cost resources, paid once when a subordinate is successfully assigned. If any stock is below the cost, the assignment is rejected with an explanation (e.g. "Not enough Materials: … costs 10 Materials, but only 7 are available."). Nothing is charged, and no task or subordinate state changes. A cost never drives a stockpile negative. Rejections for a busy subordinate or an already-assigned task are also explained and never charge. Re-confirming the same subordinate on the same task does not charge again. A paid cost is not refunded; there is no cancellation. A costed assignment is logged as "<subordinate> assigned to <task>; 10 Materials spent." Free tasks are not logged on assignment, as before.
 - **Requisition Food Stores:** Logistics, duration-based, 5 ticks (one progress per tick, completes on tick five), no cost, one-time, +10 Biologics on completion. It is logged as "<task> delivers 10 Biologics to the hive's stores." The reward is added in the task step of the tick, before normal generation.
+- **Commission Emergency Food Convoy:** Logistics, duration-based, 5 ticks, one-time. It costs 10 Materials on assignment and adds +20 Biologics on completion, logged the same way. The subordinate stays busy until completion and is then released. It is a bounded trade: spend Materials now and tie up one subordinate for five days in exchange for a larger food delivery. Values are prototype tuning, not final balance.
 - **Tick order:** day advances, tasks progress, resources are generated, tribute is checked, then a random event may occur.
 - **Generation per tick:** Materials +1–3, Biologics +1–2, Minerals +0–2.
 - **Deficit:** Losses from events can push a stockpile below zero. The UI marks negative stock as a deficit. Generation continues to add normally. A deficit currently has no further consequence (see `DECISIONS.md`).
