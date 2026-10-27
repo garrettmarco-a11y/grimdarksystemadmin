@@ -85,6 +85,7 @@ class Task:
     description: str = ""
     duration_ticks: Optional[int] = None
     rewards: Dict["ResourceType", int] = field(default_factory=dict)  # Granted once, on completion
+    cost: Dict["ResourceType", int] = field(default_factory=dict)  # Paid once, on successful assignment
     
     @property
     def is_complete(self) -> bool:
@@ -109,6 +110,15 @@ class Resources:
             self.biologics += amount
         elif resource_type == ResourceType.MINERALS:
             self.minerals += amount
+    
+    def get(self, resource_type: ResourceType) -> int:
+        """Get the current stock of a specific type"""
+        if resource_type == ResourceType.MATERIALS:
+            return self.materials
+        elif resource_type == ResourceType.BIOLOGICS:
+            return self.biologics
+        else:
+            return self.minerals
     
     def subtract(self, resource_type: ResourceType, amount: int) -> bool:
         """Subtract resources if available, return True if successful"""

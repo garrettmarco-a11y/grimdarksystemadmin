@@ -68,9 +68,11 @@ class GameState:
         description: str = "",
         duration_ticks: Optional[int] = None,
         rewards: Optional[Dict[ResourceType, int]] = None,
+        cost: Optional[Dict[ResourceType, int]] = None,
     ):
         """Add a task. Duration-based tasks advance once per tick; skill-based tasks roll for progress.
-        Rewards are granted once, when the task completes."""
+        Cost is paid once, when a subordinate is successfully assigned; rewards are granted once,
+        when the task completes."""
         task = Task(
             name,
             area,
@@ -78,19 +80,48 @@ class GameState:
             description=description,
             duration_ticks=duration_ticks,
             rewards=dict(rewards or {}),
+            cost=dict(cost or {}),
         )
         self.tasks.append(task)
     
-    def assign_subordinate_to_task(self, subordinate_name: str, task_name: str) -> bool:
-        """Assign an available subordinate to an unassigned task."""
+    def assignment_error(self, subordinate_name: str, task_name: str) -> Optional[str]:
+        """Explain why an assignment would be rejected, or return None if it is allowed."""
         subordinate = next((s for s in self.subordinates if s.name == subordinate_name), None)
         task = next((t for t in self.tasks if t.name == task_name and not t.is_complete), None)
-        if subordinate is None or task is None:
-            return False
+        if subordinate is None:
+            return f"No subordinate named '{subordinate_name}'."
+        if task is None:
+            return f"No available task named '{task_name}'."
         if subordinate.current_task and subordinate.current_task != task_name:
-            return False
+            return f"{subordinate_name} is already working on {subordinate.current_task}."
         if task.assigned_subordinate and task.assigned_subordinate != subordinate_name:
+            return f"{task_name} is already assigned to {task.assigned_subordinate}."
+        if task.assigned_subordinate == subordinate_name:
+            return None  # Already assigned; nothing further to pay
+        for resource_type, amount in task.cost.items():
+            available = self.resources.get(resource_type)
+            if available < amount:
+                return (
+                    f"Not enough {resource_type.value}: {task_name} costs {amount} "
+                    f"{resource_type.value}, but only {available} are available."
+                )
+        return None
+
+    def assign_subordinate_to_task(self, subordinate_name: str, task_name: str) -> bool:
+        """Assign an available subordinate to an unassigned task, paying its cost."""
+        if self.assignment_error(subordinate_name, task_name) is not None:
             return False
+        subordinate = next(s for s in self.subordinates if s.name == subordinate_name)
+        task = next(t for t in self.tasks if t.name == task_name and not t.is_complete)
+        if task.assigned_subordinate == subordinate_name:
+            return True
+        for resource_type, amount in task.cost.items():
+            self.resources.subtract(resource_type, amount)
+        if task.cost:
+            spent = ", ".join(f"{amount} {resource_type.value}" for resource_type, amount in task.cost.items())
+            self.events_log.append(
+                f"Day {self.day}: {subordinate_name} assigned to {task_name}; {spent} spent."
+            )
         subordinate.current_task = task_name
         task.assigned_subordinate = subordinate_name
         return True
@@ -203,4 +234,13 @@ def add_starting_tasks(state: GameState):
         description="Commandeer nutrient-paste stocks from the agri-levels. "
                     "After 5 days, adds 10 Biologics to the hive's food supply.",
         rewards={ResourceType.BIOLOGICS: 10},
+    )
+    state.add_task(
+        "Commission Emergency Food Convoy",
+        GovernanceArea.LOGISTICS,
+        duration_ticks=5,
+        description="Pay off-world factors to run a guarded grain convoy. "
+                    "Costs 10 Materials when assigned; after 5 days, adds 20 Biologics to the hive's food supply.",
+        rewards={ResourceType.BIOLOGICS: 20},
+        cost={ResourceType.MATERIALS: 10},
     )

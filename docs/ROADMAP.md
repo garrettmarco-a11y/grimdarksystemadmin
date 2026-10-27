@@ -28,7 +28,11 @@ Current status: the core task behavior is implemented in the single-file prototy
 
 **Goal:** Add one resource-linked task that makes an administrative decision matter.
 
-First feature (implemented): `Requisition Food Stores`, a one-time, 5-tick Logistics task that adds 10 Biologics (food) on completion. No consumption, starvation, persistent bonuses, or supply chains. Do not implement a complete supply-chain simulation in this stage.
+First feature (implemented): `Requisition Food Stores`, a one-time, 5-tick Logistics task that adds 10 Biologics (food) on completion.
+
+Second feature (implemented): `Commission Emergency Food Convoy`, a one-time, 5-tick Logistics task that costs 10 Materials on assignment and adds 20 Biologics on completion. This is the first decision that trades one resource for another.
+
+Neither adds consumption, starvation, persistent bonuses, recurring tasks, or supply chains. Do not implement a complete supply-chain simulation in this stage.
 
 Remaining for Stage B: decide the next food step (repeatable or skill-based production, consumption) and when to retire the Administrative Audit test action.
 

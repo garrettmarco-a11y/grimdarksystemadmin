@@ -405,7 +405,8 @@ class GDSAGui:
                 messagebox.showinfo("Assignment", f"{subordinate_name} assigned to {task_name}")
                 self._update_display()
             else:
-                messagebox.showerror("Assignment Failed", "Could not assign subordinate to task")
+                reason = self.game.assignment_error(subordinate_name, task_name) or "Could not assign subordinate to task"
+                messagebox.showerror("Assignment Failed", reason)
         else:
             messagebox.showwarning("Assignment", "Please select both a subordinate and a task")
     

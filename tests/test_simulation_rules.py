@@ -72,6 +72,7 @@ class StartingStateTests(unittest.TestCase):
                 ("Noble Relations", GovernanceArea.INTELLIGENCE, 20, None, 0, None),
                 ("Test Action: Administrative Audit", GovernanceArea.INTELLIGENCE, 5, 5, 0, None),
                 ("Requisition Food Stores", GovernanceArea.LOGISTICS, 5, 5, 0, None),
+                ("Commission Emergency Food Convoy", GovernanceArea.LOGISTICS, 5, 5, 0, None),
             ],
         )
         self.assertEqual(state.tasks[0].description, "Increase mineral extraction efficiency")
