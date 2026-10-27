@@ -18,6 +18,7 @@ This file distinguishes current working decisions from matters that still need d
 - **Food (Stage B first step):** The existing Biologics inventory is the city's food supply. The internal resource type and event rules are unchanged.
 - **First food action:** `Requisition Food Stores`, a duration-based 5-tick task granting a one-time +10 Biologics on completion. The Administrative Audit test action stays until this loop is verified.
 - **Second food action:** `Commission Emergency Food Convoy`, a duration-based 5-tick task. It costs 10 Materials, paid once on successful assignment, never refunded and never driving stock negative, and grants a one-time +20 Biologics on completion.
+- **First Security action:** `Restore Order in the Lower Hab-Blocks`, a duration-based 5-tick task costing 5 Materials with no resource reward. Completion grants protection that suppresses exactly the next Food Riots event, then lapses. Implemented as a single task flag (`prevents_next_food_riot`) and a game-state flag (`food_riot_protection`), not a general event-prevention framework.
 - **Assignment feedback:** rejected assignments show the reason, provided by the simulation (`GameState.assignment_error`).
 - **Coding-agent behavior:** Small changes, tests, diff review, and no unrequested commits/pushes.
 
