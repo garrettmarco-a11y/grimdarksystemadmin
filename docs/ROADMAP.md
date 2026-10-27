@@ -32,7 +32,9 @@ First feature (implemented): `Requisition Food Stores`, a one-time, 5-tick Logis
 
 Second feature (implemented): `Commission Emergency Food Convoy`, a one-time, 5-tick Logistics task that costs 10 Materials on assignment and adds 20 Biologics on completion. This is the first decision that trades one resource for another.
 
-Neither adds consumption, starvation, persistent bonuses, recurring tasks, or supply chains. Do not implement a complete supply-chain simulation in this stage.
+Third feature (implemented): `Restore Order in the Lower Hab-Blocks`, a one-time, 5-tick Security task that costs 5 Materials and, on completion, prevents the next Food Riots event. This is the first preventive decision: pay now to reduce the risk of a future loss.
+
+None of these adds consumption, starvation, persistent bonuses, recurring tasks, or supply chains. Do not implement a complete supply-chain simulation in this stage.
 
 Remaining for Stage B: decide the next food step (repeatable or skill-based production, consumption) and when to retire the Administrative Audit test action.
 

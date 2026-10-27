@@ -13,6 +13,9 @@ from .models import (
     Task,
 )
 
+# Text of the Food Riots random event; also identifies it for riot protection.
+FOOD_RIOTS_EVENT = "Food riots in the lower sectors - biologics consumed."
+
 class GameState:
     """Main game state manager"""
     
@@ -26,6 +29,7 @@ class GameState:
         self.imperial_tribute_due = 7  # Days until tribute is due
         self.imperial_tribute_amount = 30  # Materials needed
         self.tribute_outcome: Optional[str] = None  # "paid" or "failed" on the tick tribute fell due
+        self.food_riot_protection = False  # Suppresses the next Food Riots event, then lapses
         
     def _generate_starting_subordinates(self) -> List[Subordinate]:
         """Generate starting subordinates with random stats"""
@@ -69,6 +73,7 @@ class GameState:
         duration_ticks: Optional[int] = None,
         rewards: Optional[Dict[ResourceType, int]] = None,
         cost: Optional[Dict[ResourceType, int]] = None,
+        prevents_next_food_riot: bool = False,
     ):
         """Add a task. Duration-based tasks advance once per tick; skill-based tasks roll for progress.
         Cost is paid once, when a subordinate is successfully assigned; rewards are granted once,
@@ -81,6 +86,7 @@ class GameState:
             duration_ticks=duration_ticks,
             rewards=dict(rewards or {}),
             cost=dict(cost or {}),
+            prevents_next_food_riot=prevents_next_food_riot,
         )
         self.tasks.append(task)
     
@@ -162,6 +168,11 @@ class GameState:
                         self.events_log.append(
                             f"Day {self.day}: {task.name} delivers {amount} {resource_type.value} to the hive's stores."
                         )
+                    if task.prevents_next_food_riot:
+                        self.food_riot_protection = True
+                        self.events_log.append(
+                            f"Day {self.day}: Order holds in the lower hab-blocks. The next food riot will be suppressed."
+                        )
 
         # Remove completed tasks
         self.tasks = [t for t in self.tasks if not t.is_complete]
@@ -195,13 +206,20 @@ class GameState:
         """Generate a random event"""
         events = [
             "Asteroid mining yields extra minerals!",
-            "Food riots in the lower sectors - biologics consumed.",
+            FOOD_RIOTS_EVENT,
             "Equipment malfunction - materials needed for repairs.",
             "Merchant convoy arrives with trade opportunities.",
             "Heretic cell discovered in the manufacturing district."
         ]
         
         event = random.choice(events)
+        if event == FOOD_RIOTS_EVENT and self.food_riot_protection:
+            self.food_riot_protection = False
+            self.events_log.append(
+                f"Day {self.day}: Food riots threatened the lower sectors, but Security forces "
+                "suppressed them. No biologics lost; the protection is spent."
+            )
+            return
         self.events_log.append(f"Day {self.day}: {event}")
         
         # Apply event effects (simplified); losses may push stock into deficit
@@ -243,4 +261,14 @@ def add_starting_tasks(state: GameState):
                     "Costs 10 Materials when assigned; after 5 days, adds 20 Biologics to the hive's food supply.",
         rewards={ResourceType.BIOLOGICS: 20},
         cost={ResourceType.MATERIALS: 10},
+    )
+    state.add_task(
+        "Restore Order in the Lower Hab-Blocks",
+        GovernanceArea.SECURITY,
+        duration_ticks=5,
+        description="Send enforcers to crush unrest in the lower hab-blocks. "
+                    "Costs 5 Materials when assigned; after 5 days, prevents the next food riot. "
+                    "No resource reward.",
+        cost={ResourceType.MATERIALS: 5},
+        prevents_next_food_riot=True,
     )

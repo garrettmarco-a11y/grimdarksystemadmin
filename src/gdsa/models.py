@@ -86,6 +86,7 @@ class Task:
     duration_ticks: Optional[int] = None
     rewards: Dict["ResourceType", int] = field(default_factory=dict)  # Granted once, on completion
     cost: Dict["ResourceType", int] = field(default_factory=dict)  # Paid once, on successful assignment
+    prevents_next_food_riot: bool = False  # On completion, suppresses the next Food Riots event
     
     @property
     def is_complete(self) -> bool:
