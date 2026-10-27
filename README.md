@@ -11,7 +11,7 @@ This repository is being organized for incremental development with Git and a co
 - Agents can be assigned tasks that take time, occupy the agent, and report completion.
 - Current resource-linked actions are `Requisition Food Stores` (gain 10 Biologics after five ticks), `Commission Emergency Food Convoy` (spend 10 Materials to gain 20 Biologics after five ticks), and `Restore Order in the Lower Hab-Blocks` (spend 5 Materials to suppress the next Food Riots event after five ticks).
 - `Test Action: Administrative Audit` remains available as a deterministic five-tick task for checking the task lifecycle.
-- The prototype has daily resource generation, Imperial tribute, and placeholder random events. It does not yet consume food, simulate starvation, or model a full supply chain.
+- The prototype has daily resource generation, Imperial tribute, placeholder random events, and a limited food upkeep: every 7 days (Day 7, 14, 21, ...) the hive consumes 10 Biologics, with shortages logged and shown as a deficit. It does not simulate starvation, population, or a full supply chain.
 - Simulation logic is separated from Tkinter so the standard-library test suite can run without a display. Automated tests cover the simulation rules; the GUI should also be checked by launching it.
 
 The current development focus is Stage B: making administrative actions produce understandable trade-offs without prematurely building the full economy. Before adding another mechanic, decide what the next playable loop should demonstrate and when the test action can be retired. See `docs/ROADMAP.md` and `docs/DECISIONS.md`.

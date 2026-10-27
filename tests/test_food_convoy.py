@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from gdsa.models import GovernanceArea, ResourceType  # noqa: E402
-from gdsa.simulation import GameState, add_starting_tasks  # noqa: E402
+from gdsa.simulation import FOOD_UPKEEP_AMOUNT, GameState, add_starting_tasks  # noqa: E402
 
 CONVOY = "Commission Emergency Food Convoy"
 
@@ -147,7 +147,8 @@ class FoodConvoyTests(unittest.TestCase):
         self.assign()
         for _ in range(15):
             quiet_tick(self.state)
-        self.assertEqual(stock(self.state), (40, 50, 20))
+        # Days 7 and 14 each charge food upkeep.
+        self.assertEqual(stock(self.state), (40, 50 - 2 * FOOD_UPKEEP_AMOUNT, 20))
         self.assertEqual(sum("delivers 20" in e for e in self.state.events_log), 1)
         self.assertEqual(
             self.state.assignment_error(self.agent.name, CONVOY), f"No available task named '{CONVOY}'."

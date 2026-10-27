@@ -7,7 +7,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from gdsa.models import GovernanceArea, ResourceType  # noqa: E402
-from gdsa.simulation import FOOD_RIOTS_EVENT, GameState, add_starting_tasks  # noqa: E402
+from gdsa.simulation import (  # noqa: E402
+    FOOD_RIOTS_EVENT,
+    FOOD_UPKEEP_AMOUNT,
+    GameState,
+    add_starting_tasks,
+)
+
+# Day 7 food upkeep falls on the tick after the task completes.
+DAY7_BIOLOGICS = 30 - FOOD_UPKEEP_AMOUNT
 
 RESTORE_ORDER = "Restore Order in the Lower Hab-Blocks"
 OTHER_EVENTS = (
@@ -157,7 +165,7 @@ class RestoreOrderTaskTests(unittest.TestCase):
     def test_food_riot_prevented_and_protection_consumed(self):
         self.complete()
         event_tick(self.state, FOOD_RIOTS_EVENT, amount=7)
-        self.assertEqual(self.state.resources.biologics, 30)
+        self.assertEqual(self.state.resources.biologics, DAY7_BIOLOGICS)
         self.assertFalse(self.state.food_riot_protection)
         self.assertNotIn(f"Day 7: {FOOD_RIOTS_EVENT}", self.state.events_log)
         self.assertIn(
@@ -170,7 +178,7 @@ class RestoreOrderTaskTests(unittest.TestCase):
         self.complete()
         event_tick(self.state, FOOD_RIOTS_EVENT, amount=7)
         event_tick(self.state, FOOD_RIOTS_EVENT, amount=6)
-        self.assertEqual(self.state.resources.biologics, 24)
+        self.assertEqual(self.state.resources.biologics, DAY7_BIOLOGICS - 6)
         self.assertIn(f"Day 8: {FOOD_RIOTS_EVENT}", self.state.events_log)
         self.assertEqual(sum("suppressed them" in e for e in self.state.events_log), 1)
         self.assertFalse(self.state.food_riot_protection)
@@ -179,10 +187,10 @@ class RestoreOrderTaskTests(unittest.TestCase):
 
     def test_other_events_unaffected_and_do_not_consume_protection(self):
         expected = {
-            OTHER_EVENTS[0]: (45, 30, 27),  # +7 Minerals
-            OTHER_EVENTS[1]: (38, 30, 20),  # -7 Materials
-            OTHER_EVENTS[2]: (45, 30, 20),
-            OTHER_EVENTS[3]: (45, 30, 20),
+            OTHER_EVENTS[0]: (45, DAY7_BIOLOGICS, 27),  # +7 Minerals
+            OTHER_EVENTS[1]: (38, DAY7_BIOLOGICS, 20),  # -7 Materials
+            OTHER_EVENTS[2]: (45, DAY7_BIOLOGICS, 20),
+            OTHER_EVENTS[3]: (45, DAY7_BIOLOGICS, 20),
         }
         for text, resources in expected.items():
             with self.subTest(event=text):

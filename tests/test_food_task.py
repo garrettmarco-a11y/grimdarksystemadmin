@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from gdsa.models import GovernanceArea, ResourceType  # noqa: E402
-from gdsa.simulation import GameState, add_starting_tasks  # noqa: E402
+from gdsa.simulation import FOOD_UPKEEP_AMOUNT, GameState, add_starting_tasks  # noqa: E402
 
 FOOD_TASK = "Requisition Food Stores"
 
@@ -76,7 +76,8 @@ class FoodTaskTests(unittest.TestCase):
             quiet_tick(self.state)
         for _ in range(10):
             quiet_tick(self.state)
-        self.assertEqual(self.state.resources.biologics, 40)
+        # Days 7 and 14 each charge food upkeep.
+        self.assertEqual(self.state.resources.biologics, 40 - 2 * FOOD_UPKEEP_AMOUNT)
         self.assertEqual(sum("delivers" in e for e in self.state.events_log), 1)
         self.assertFalse(self.state.assign_subordinate_to_task(self.agent.name, FOOD_TASK))
 
