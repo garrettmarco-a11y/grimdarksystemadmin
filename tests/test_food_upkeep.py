@@ -90,25 +90,28 @@ class FoodUpkeepStockTests(unittest.TestCase):
         self.assertEqual(self.state.resources.biologics, 0)
         self.assertEqual(upkeep_lines(self.state), ["Day 7: Food upkeep: the hive consumes 10 Biologics."])
 
-    def test_shortage_reported_and_drives_deficit(self):
+    def test_shortage_consumes_only_what_is_in_store(self):
         self.upkeep_tick(4)
-        self.assertEqual(self.state.resources.biologics, -6)
+        self.assertEqual(self.state.resources.biologics, 0)
         self.assertEqual(
             upkeep_lines(self.state),
             ["Day 7: FOOD SHORTAGE: upkeep needed 10 Biologics but only 4 were in store. "
-             "Biologics now at -6 (deficit)."],
+             "The hive went 6 short."],
         )
 
-    def test_shortage_from_existing_deficit(self):
+    def test_shortage_from_existing_event_deficit_consumes_nothing(self):
+        # Random events may still leave Biologics negative; upkeep never deepens it.
         self.upkeep_tick(-3)
-        self.assertEqual(self.state.resources.biologics, -13)
-        self.assertIn("only 0 were in store. Biologics now at -13 (deficit).", upkeep_lines(self.state)[0])
+        self.assertEqual(self.state.resources.biologics, -3)
+        self.assertIn("only 0 were in store. The hive went 10 short.", upkeep_lines(self.state)[0])
 
-    def test_deficit_persists_and_next_upkeep_deepens_it(self):
+    def test_shortage_is_not_carried_as_debt(self):
         self.upkeep_tick(4)
+        self.state.resources.biologics = 12  # Restocked before the next upkeep
         ticks_to_day(self.state, 14)
-        self.assertEqual(self.state.resources.biologics, -16)
-        self.assertEqual(sum("FOOD SHORTAGE" in e for e in self.state.events_log), 2)
+        self.assertEqual(self.state.resources.biologics, 2)
+        self.assertEqual(sum("FOOD SHORTAGE" in e for e in self.state.events_log), 1)
+        self.assertIn("Day 14: Food upkeep: the hive consumes 10 Biologics.", self.state.events_log)
 
     def test_upkeep_affects_only_biologics(self):
         self.upkeep_tick(30)

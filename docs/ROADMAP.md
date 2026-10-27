@@ -29,13 +29,15 @@ Implemented starting actions:
 
 These actions introduce a basic reward, a resource trade, and a preventive action. Costs are paid on successful assignment; rewards and protection activate on completion. The Administrative Audit test action remains available.
 
-**Food upkeep (implemented, limited prototype):** every 7 days (Day 7, 14, 21, ...) the hive consumes 10 Biologics. A shortfall is logged as a FOOD SHORTAGE and leaves Biologics in deficit, with no further consequence. This gives the player a predictable obligation to plan around, which random events can complicate.
+**Food upkeep (implemented, limited prototype):** every 7 days (Day 7, 14, 21, ...) the hive consumes 10 Biologics, taking only what is in store. A shortfall is logged as a FOOD SHORTAGE and is not carried as debt. This gives the player a predictable obligation to plan around, which random events can complicate.
 
-**Current boundary:** There is no per-tick consumption, starvation, population or contentment effect, recurring production, or full supply-chain simulation. Daily resource generation, tribute, and placeholder random events remain as previously documented. Do not add those systems by implication.
+**Population and public order (implemented, limited prototype):** hidden Proles, Free Traders, and Nobles groups have contentedness that responds to whether weekly upkeep fed them. The player sees only a broad public-order status (Stable, Strained, Discontented, Unrest). Population is fixed, and public order has no gameplay consequences yet. A read-only debug tab (`--debug`) exposes the hidden values for testing.
+
+**Current boundary:** There is no per-tick consumption, starvation, population change, rebellion, recurring production, or full supply-chain simulation. Public order is informational only. Daily resource generation, tribute, and placeholder random events remain as previously documented. Do not add those systems by implication.
 
 **Next step — design decision, not an approved implementation task:** Decide what the next playable loop should demonstrate before adding another mechanic. In particular:
 - Food now has a weekly upkeep but only one-off replenishment actions. Should the next milestone introduce recurring production?
-- What player-visible consequence should a food shortfall have beyond the current shortage report and deficit marker?
+- What should public order eventually affect (events, tribute, Security tasks), and should food riots or Restore Order feed into contentedness?
 - When can the Administrative Audit test action be retired without losing useful regression coverage?
 
 The older proposal in PR #2 combines weekly skill rolls, upkeep, and repeatable Hydroponics Shift. It is not approved for the current direction and should not be merged as-is. Any of those ideas should be reconsidered separately with explicit acceptance criteria.

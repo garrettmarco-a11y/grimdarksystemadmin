@@ -6,14 +6,17 @@
 src/grimdark_system_admin.py   thin launcher for `python src/grimdark_system_admin.py`
 src/gdsa/__main__.py           allows `python -m gdsa` (with `src` on the path)
 src/gdsa/models.py             DiceType, ResourceType, GovernanceArea, DicePool, Subordinate, Task, Resources
-src/gdsa/simulation.py         GameState (tick rules, tribute, events) and add_starting_tasks()
+src/gdsa/simulation.py         GameState (tick rules, tribute, events, food upkeep) and add_starting_tasks()
+src/gdsa/population.py         population groups, weekly contentedness rules, public-order thresholds
 src/gdsa/ui.py                 GDSAGui: Tkinter widgets, automation timer, rendering
-src/gdsa/app.py                main(): builds the Tk root and starts the event loop
+src/gdsa/app.py                main(): parses --debug, builds the Tk root and starts the event loop
 ```
 
-`models.py` and `simulation.py` must not import Tkinter; `tests/test_simulation_rules.py` enforces this. The GUI reads `GameState` and calls its methods. Per-tick results the UI needs to react to (currently `GameState.tribute_outcome`) are exposed as state rather than recomputed by the UI.
+`models.py`, `population.py`, and `simulation.py` must not import Tkinter; `tests/test_simulation_rules.py` enforces this. The GUI reads `GameState` and calls its methods. Per-tick results the UI needs to react to (currently `GameState.tribute_outcome`) are exposed as state rather than recomputed by the UI.
 
 The package was extracted from the original single-file baseline without changing simulation behavior; a seeded multi-run comparison of full game state and event logs matched exactly.
+
+**Hidden state and debug access.** Hidden simulation state (currently population contentedness) stays in the simulation layer. The normal UI shows only derived, player-facing values (`GameState.public_order`). Developer diagnostics are produced by read-only simulation methods (`GameState.population_debug_report()`) and shown only when the app is launched with `--debug`. Follow this pattern for future hidden systems instead of adding details to the normal UI.
 
 ## Current constraints
 
