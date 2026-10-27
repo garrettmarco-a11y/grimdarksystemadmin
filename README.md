@@ -6,11 +6,15 @@ This repository is being organized for incremental development with Git and a co
 
 ## Current status
 
-- Working baseline: the existing single-file Python/Tkinter prototype.
-- Simulation includes subordinate skill dice, task assignment and progress, resource inventories, daily ticks, tribute, and random events.
-- A deterministic five-tick `Test Action: Administrative Audit` is included to validate the task lifecycle.
-- Simulation logic lives in a Tkinter-free package (`src/gdsa/`), so the tests run without a display or a Tkinter install.
-- Automated tests cover the simulation rules; the GUI is not covered by automated UI tests and should be checked by launching it.
+- The simulation and GUI are separated into a small package under `src/gdsa/`.
+- The game starts paused and advances in daily ticks when the player chooses to run it.
+- Agents can be assigned tasks that take time, occupy the agent, and report completion.
+- Current resource-linked actions are `Requisition Food Stores` (gain 10 Biologics after five ticks), `Commission Emergency Food Convoy` (spend 10 Materials to gain 20 Biologics after five ticks), and `Restore Order in the Lower Hab-Blocks` (spend 5 Materials to suppress the next Food Riots event after five ticks).
+- `Test Action: Administrative Audit` remains available as a deterministic five-tick task for checking the task lifecycle.
+- The prototype has daily resource generation, Imperial tribute, and placeholder random events. It does not yet consume food, simulate starvation, or model a full supply chain.
+- Simulation logic is separated from Tkinter so the standard-library test suite can run without a display. Automated tests cover the simulation rules; the GUI should also be checked by launching it.
+
+The current development focus is Stage B: making administrative actions produce understandable trade-offs without prematurely building the full economy. Before adding another mechanic, decide what the next playable loop should demonstrate and when the test action can be retired. See `docs/ROADMAP.md` and `docs/DECISIONS.md`.
 
 ## Requirements
 
@@ -57,9 +61,5 @@ tests/                         unittest suite
 - `docs/ARCHITECTURE.md` — current code shape and intended direction.
 - `docs/WORKFLOW.md` — recommended Git and coding-agent workflow.
 - `docs/DECISIONS.md` — decisions already made and open questions.
-
-## Next development milestone
-
-Simulation and GUI are now separated (a Stage B entry criterion). The next proposed gameplay addition is a simple food inventory/production action, implemented as a small, tested feature once its acceptance criteria are agreed. See `docs/ROADMAP.md`.
 
 Do not commit local save data, credentials, virtual environments, or editor caches; `.gitignore` covers the common cases.
