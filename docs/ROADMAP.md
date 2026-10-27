@@ -1,47 +1,47 @@
 # Development Roadmap
 
-## Current milestone: Repository foundation and stable prototype
+## Current milestone: Stage B — Meaningful administration
 
-**Goal:** Put the existing playable Python version under version control with a clear, testable development workflow.
+**Goal:** Add a small set of resource-linked actions that make administrative choices matter, while keeping the game playable and avoiding a premature full-economy simulation.
 
-- [x] Preserve the working Python/Tkinter version.
-- [x] Establish project instructions and documentation.
-- [x] Add regression tests for the basic task lifecycle.
-- [x] Initialize Git and create the remote repository.
-- [ ] Confirm the project launches from the documented path on the development machine.
-
-## Stage A — Operational prototype
+### Stage A — Operational prototype
 
 **Goal:** The player can assign an agent to an action, advance time, observe progress, and receive a completion report.
 
-- Clock advances one day per tick.
-- Agents can be assigned to tasks.
-- An agent cannot be assigned to multiple tasks simultaneously.
-- Duration-based tasks progress once per tick.
-- A five-tick test action completes on the fifth tick, not earlier.
-- Completion is logged and the agent becomes available again.
-- The GUI continues to launch and display the state correctly.
+- [x] Clock advances one day per tick.
+- [x] Agents can be assigned to tasks.
+- [x] An agent cannot be assigned to multiple tasks simultaneously.
+- [x] Duration-based tasks progress once per tick.
+- [x] A five-tick test action completes on the fifth tick, not earlier.
+- [x] Completion is logged and the agent becomes available again.
+- [x] Simulation logic is separated from GUI code enough to test without a display.
+- [ ] Confirm the project launches and behaves correctly on the developer's physical desktop after recent changes.
 
-Current status: the core task behavior is implemented in the single-file prototype. Repository setup and stronger regression coverage remain.
+Stage A's core task loop is implemented and covered by tests. The remaining checkbox is a manual verification reminder, not a blocker for reviewing the simulation rules.
 
-## Stage B — Meaningful administration
+### Stage B — Meaningful administration
 
-**Goal:** Add one resource-linked task that makes an administrative decision matter.
+Implemented starting actions:
 
-First feature (implemented): `Requisition Food Stores`, a one-time, 5-tick Logistics task that adds 10 Biologics (food) on completion.
+1. **Requisition Food Stores** — Logistics, one-time, five ticks, no cost, +10 Biologics on completion.
+2. **Commission Emergency Food Convoy** — Logistics, one-time, five ticks, costs 10 Materials on assignment, +20 Biologics on completion.
+3. **Restore Order in the Lower Hab-Blocks** — Security, one-time, five ticks, costs 5 Materials on assignment, suppresses the next Food Riots event after completion.
 
-Second feature (implemented): `Commission Emergency Food Convoy`, a one-time, 5-tick Logistics task that costs 10 Materials on assignment and adds 20 Biologics on completion. This is the first decision that trades one resource for another.
+These actions introduce a basic reward, a resource trade, and a preventive action. Costs are paid on successful assignment; rewards and protection activate on completion. The Administrative Audit test action remains available.
 
-Third feature (implemented): `Restore Order in the Lower Hab-Blocks`, a one-time, 5-tick Security task that costs 5 Materials and, on completion, prevents the next Food Riots event. This is the first preventive decision: pay now to reduce the risk of a future loss.
+**Current boundary:** There is no food consumption, starvation, recurring production, or full supply-chain simulation. Daily resource generation, tribute, and placeholder random events remain as previously documented. Do not add those systems by implication.
 
-None of these adds consumption, starvation, persistent bonuses, recurring tasks, or supply chains. Do not implement a complete supply-chain simulation in this stage.
+**Next step — design decision, not an approved implementation task:** Decide what the next playable loop should demonstrate before adding another mechanic. In particular:
+- Should food remain a stockpile the player can replenish with one-off actions for now, or should the next milestone introduce recurring production and/or consumption?
+- What player-visible consequence should a food shortfall have, if any, and how will it be communicated?
+- When can the Administrative Audit test action be retired without losing useful regression coverage?
 
-Remaining for Stage B: decide the next food step (repeatable or skill-based production, consumption) and when to retire the Administrative Audit test action.
+The older proposal in PR #2 combines weekly skill rolls, upkeep, and repeatable Hydroponics Shift. It is not approved for the current direction and should not be merged as-is. Any of those ideas should be reconsidered separately with explicit acceptance criteria.
 
 Entry criteria:
 - [x] Stage A tests pass.
 - [x] Simulation logic is separated from GUI code enough to test without a display.
-- [x] Current resource behavior is documented (`docs/GAME_DESIGN.md`, "Current rules and values").
+- [x] Current resource behavior is documented in `docs/GAME_DESIGN.md`.
 
 ## Stage C — Interconnected pressures
 
