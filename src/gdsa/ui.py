@@ -3,7 +3,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 
-from .simulation import GameState, add_starting_tasks
+from .simulation import FOOD_UPKEEP_AMOUNT, GameState, add_starting_tasks
 
 class GDSAGui:
     """Main GUI class for the Grimdark System Admin game"""
@@ -78,6 +78,9 @@ class GDSAGui:
         
         self.tribute_label = ttk.Label(self.status_frame, text="Imperial Tribute Due: 7 days")
         self.tribute_label.pack(anchor=tk.W)
+        
+        self.food_upkeep_label = ttk.Label(self.status_frame, text="Food Upkeep Due: 6 days")
+        self.food_upkeep_label.pack(anchor=tk.W)
         
         # Controls
         controls_frame = ttk.Frame(top_frame)
@@ -270,6 +273,12 @@ class GDSAGui:
         else:
             tribute_text = f"Imperial Tribute Due: {self.game.imperial_tribute_due} days ({self.game.imperial_tribute_amount} Materials)"
         self.tribute_label.config(text=tribute_text)
+        
+        # Warn when current stores would not cover the next upkeep
+        upkeep_text = f"Food Upkeep Due: {self.game.food_upkeep_due_in} days ({FOOD_UPKEEP_AMOUNT} Biologics)"
+        if self.game.resources.biologics < FOOD_UPKEEP_AMOUNT:
+            upkeep_text = "⚠️ " + upkeep_text
+        self.food_upkeep_label.config(text=upkeep_text)
     
     def _update_resources(self):
         """Update resources display"""

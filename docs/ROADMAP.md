@@ -29,11 +29,13 @@ Implemented starting actions:
 
 These actions introduce a basic reward, a resource trade, and a preventive action. Costs are paid on successful assignment; rewards and protection activate on completion. The Administrative Audit test action remains available.
 
-**Current boundary:** There is no food consumption, starvation, recurring production, or full supply-chain simulation. Daily resource generation, tribute, and placeholder random events remain as previously documented. Do not add those systems by implication.
+**Food upkeep (implemented, limited prototype):** every 7 days (Day 7, 14, 21, ...) the hive consumes 10 Biologics. A shortfall is logged as a FOOD SHORTAGE and leaves Biologics in deficit, with no further consequence. This gives the player a predictable obligation to plan around, which random events can complicate.
+
+**Current boundary:** There is no per-tick consumption, starvation, population or contentment effect, recurring production, or full supply-chain simulation. Daily resource generation, tribute, and placeholder random events remain as previously documented. Do not add those systems by implication.
 
 **Next step — design decision, not an approved implementation task:** Decide what the next playable loop should demonstrate before adding another mechanic. In particular:
-- Should food remain a stockpile the player can replenish with one-off actions for now, or should the next milestone introduce recurring production and/or consumption?
-- What player-visible consequence should a food shortfall have, if any, and how will it be communicated?
+- Food now has a weekly upkeep but only one-off replenishment actions. Should the next milestone introduce recurring production?
+- What player-visible consequence should a food shortfall have beyond the current shortage report and deficit marker?
 - When can the Administrative Audit test action be retired without losing useful regression coverage?
 
 The older proposal in PR #2 combines weekly skill rolls, upkeep, and repeatable Hydroponics Shift. It is not approved for the current direction and should not be merged as-is. Any of those ideas should be reconsidered separately with explicit acceptance criteria.

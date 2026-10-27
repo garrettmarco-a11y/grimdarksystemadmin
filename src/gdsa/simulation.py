@@ -16,6 +16,11 @@ from .models import (
 # Text of the Food Riots random event; also identifies it for riot protection.
 FOOD_RIOTS_EVENT = "Food riots in the lower sectors - biologics consumed."
 
+# Food upkeep: the hive consumes this many Biologics on every day divisible by the interval
+# (Day 7, 14, 21, ...). Shortfalls follow the resource-deficit convention.
+FOOD_UPKEEP_INTERVAL_DAYS = 7
+FOOD_UPKEEP_AMOUNT = 10
+
 class GameState:
     """Main game state manager"""
     
@@ -182,6 +187,10 @@ class GameState:
         self.resources.add(ResourceType.BIOLOGICS, random.randint(1, 2))
         self.resources.add(ResourceType.MINERALS, random.randint(0, 2))
         
+        # Food upkeep
+        if self.day % FOOD_UPKEEP_INTERVAL_DAYS == 0:
+            self._handle_food_upkeep()
+        
         # Check imperial tribute
         if self.imperial_tribute_due <= 0:
             self._handle_imperial_tribute()
@@ -190,6 +199,25 @@ class GameState:
         if random.random() < 0.1:
             self._generate_random_event()
     
+    @property
+    def food_upkeep_due_in(self) -> int:
+        """Days until the next food upkeep"""
+        return FOOD_UPKEEP_INTERVAL_DAYS - self.day % FOOD_UPKEEP_INTERVAL_DAYS
+
+    def _handle_food_upkeep(self):
+        """Consume the hive's weekly food; a shortfall drives Biologics into deficit"""
+        available = self.resources.biologics
+        self.resources.deduct(ResourceType.BIOLOGICS, FOOD_UPKEEP_AMOUNT)
+        if available >= FOOD_UPKEEP_AMOUNT:
+            self.events_log.append(
+                f"Day {self.day}: Food upkeep: the hive consumes {FOOD_UPKEEP_AMOUNT} Biologics."
+            )
+        else:
+            self.events_log.append(
+                f"Day {self.day}: FOOD SHORTAGE: upkeep needed {FOOD_UPKEEP_AMOUNT} Biologics but only "
+                f"{max(available, 0)} were in store. Biologics now at {self.resources.biologics} (deficit)."
+            )
+
     def _handle_imperial_tribute(self):
         """Handle imperial tribute payment"""
         if self.resources.materials >= self.imperial_tribute_amount:
