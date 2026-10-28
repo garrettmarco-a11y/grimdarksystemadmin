@@ -26,6 +26,7 @@ Implemented starting actions:
 1. **Requisition Food Stores** — Logistics, one-time, five ticks, no cost, +10 Biologics on completion.
 2. **Commission Emergency Food Convoy** — Logistics, one-time, five ticks, costs 10 Materials on assignment, +20 Biologics on completion.
 3. **Restore Order in the Lower Hab-Blocks** — Security, one-time, five ticks, costs 5 Materials on assignment, suppresses the next Food Riots event after completion.
+4. **Maintain District Security Presence** — Security, repeatable, five ticks, costs 5 Materials on assignment; reduces shortage-driven contentedness losses by 10% for the next four weekly food upkeeps (refreshes, does not stack).
 
 These actions introduce a basic reward, a resource trade, and a preventive action. Costs are paid on successful assignment; rewards and protection activate on completion. The Administrative Audit test action remains available.
 

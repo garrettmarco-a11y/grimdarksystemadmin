@@ -10,6 +10,7 @@ from typing import List
 CONTENTEDNESS_MIN = 0
 CONTENTEDNESS_MAX = 100
 WEEKLY_RECOVERY = 2  # Per fully fed upkeep, up to the group's baseline
+FULL_PENALTY_PERCENT = 100
 
 # (minimum weighted contentedness, public-order status), highest first
 PUBLIC_ORDER_THRESHOLDS = [
@@ -53,11 +54,16 @@ def starting_groups() -> List[PopulationGroup]:
         group.contentedness = group.baseline
     return groups
 
-def feed_groups(groups: List[PopulationGroup], food_available: int) -> List[GroupChange]:
+def feed_groups(
+    groups: List[PopulationGroup],
+    food_available: int,
+    penalty_percent: int = FULL_PENALTY_PERCENT,
+) -> List[GroupChange]:
     """Feed groups in priority order from the food available and update contentedness.
 
     A fully fed group recovers WEEKLY_RECOVERY up to its baseline. A group short of its
-    demand loses its maximum penalty scaled by the unmet fraction, rounded up.
+    demand loses its maximum penalty scaled by the unmet fraction and by penalty_percent,
+    applied to the exact value and then rounded up once.
     """
     food = max(food_available, 0)
     changes = []
@@ -67,7 +73,8 @@ def feed_groups(groups: List[PopulationGroup], food_available: int) -> List[Grou
         unmet = group.food_demand - fed
         before = group.contentedness
         if unmet:
-            penalty = -(-unmet * group.max_shortage_penalty // group.food_demand)
+            penalty = -(-unmet * group.max_shortage_penalty * penalty_percent
+                        // (group.food_demand * FULL_PENALTY_PERCENT))
             group.contentedness = max(CONTENTEDNESS_MIN, before - penalty)
         elif before < group.baseline:
             group.contentedness = min(group.baseline, before + WEEKLY_RECOVERY)
