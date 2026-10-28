@@ -31,7 +31,7 @@ class SimulationIsolationTests(unittest.TestCase):
         code = (
             "import sys; sys.modules['tkinter'] = None; "
             f"sys.path.insert(0, {str(ROOT / 'src')!r}); "
-            "import gdsa.models, gdsa.simulation"
+            "import gdsa.models, gdsa.population, gdsa.simulation"
         )
         result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)

@@ -8,8 +8,9 @@ from .simulation import FOOD_UPKEEP_AMOUNT, GameState, add_starting_tasks
 class GDSAGui:
     """Main GUI class for the Grimdark System Admin game"""
     
-    def __init__(self, root):
+    def __init__(self, root, debug=False):
         self.root = root
+        self.debug = debug  # Shows the read-only population debug tab
         self.root.title("Grimdark System Admin")
         self.root.geometry("1200x800")
         self.root.configure(bg='#2b2b2b')
@@ -82,6 +83,9 @@ class GDSAGui:
         self.food_upkeep_label = ttk.Label(self.status_frame, text="Food Upkeep Due: 6 days")
         self.food_upkeep_label.pack(anchor=tk.W)
         
+        self.public_order_label = ttk.Label(self.status_frame, text="Public Order: Stable")
+        self.public_order_label.pack(anchor=tk.W)
+        
         # Controls
         controls_frame = ttk.Frame(top_frame)
         controls_frame.pack(side=tk.RIGHT)
@@ -145,6 +149,10 @@ class GDSAGui:
         
         # Events tab
         self._create_events_tab()
+        
+        # Debug tab (only with --debug)
+        if self.debug:
+            self._create_debug_tab()
     
     def _create_resources_tab(self):
         """Create the resources tab"""
@@ -254,6 +262,24 @@ class GDSAGui:
         )
         self.events_text.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
     
+    def _create_debug_tab(self):
+        """Create the read-only population debug tab (developer use only)"""
+        debug_frame = ttk.Frame(self.notebook)
+        self.notebook.add(debug_frame, text="DEBUG: Population")
+        
+        debug_label = ttk.Label(debug_frame, text="DEBUG: HIDDEN POPULATION STATE (READ-ONLY)", style='Title.TLabel')
+        debug_label.pack(pady=(10, 20))
+        
+        self.debug_text = scrolledtext.ScrolledText(
+            debug_frame,
+            wrap=tk.NONE,
+            height=25,
+            bg='#1a1a1a',
+            fg='#ffcc66',
+            font=('Courier', 10)
+        )
+        self.debug_text.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
+    
     def _update_display(self):
         """Update all display elements"""
         self._update_status()
@@ -263,6 +289,15 @@ class GDSAGui:
         self._update_events()
         self._update_comboboxes()
         self._update_speed_buttons()
+        if self.debug:
+            self._update_debug()
+    
+    def _update_debug(self):
+        """Refresh the debug tab from the simulation's read-only report"""
+        self.debug_text.config(state=tk.NORMAL)
+        self.debug_text.delete('1.0', tk.END)
+        self.debug_text.insert(tk.END, self.game.population_debug_report())
+        self.debug_text.config(state=tk.DISABLED)
     
     def _update_status(self):
         """Update status display"""
@@ -279,6 +314,12 @@ class GDSAGui:
         if self.game.resources.biologics < FOOD_UPKEEP_AMOUNT:
             upkeep_text = "⚠️ " + upkeep_text
         self.food_upkeep_label.config(text=upkeep_text)
+        
+        public_order = self.game.public_order
+        order_text = f"Public Order: {public_order}"
+        if public_order != "Stable":
+            order_text = "⚠️ " + order_text
+        self.public_order_label.config(text=order_text)
     
     def _update_resources(self):
         """Update resources display"""

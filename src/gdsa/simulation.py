@@ -12,12 +12,20 @@ from .models import (
     Subordinate,
     Task,
 )
+from .population import (
+    PUBLIC_ORDER_THRESHOLDS,
+    GroupChange,
+    feed_groups,
+    public_order_status,
+    starting_groups,
+    weighted_contentedness,
+)
 
 # Text of the Food Riots random event; also identifies it for riot protection.
 FOOD_RIOTS_EVENT = "Food riots in the lower sectors - biologics consumed."
 
 # Food upkeep: the hive consumes this many Biologics on every day divisible by the interval
-# (Day 7, 14, 21, ...). Shortfalls follow the resource-deficit convention.
+# (Day 7, 14, 21, ...). Upkeep takes only what is in store; a shortfall is not carried as debt.
 FOOD_UPKEEP_INTERVAL_DAYS = 7
 FOOD_UPKEEP_AMOUNT = 10
 
@@ -35,6 +43,10 @@ class GameState:
         self.imperial_tribute_amount = 30  # Materials needed
         self.tribute_outcome: Optional[str] = None  # "paid" or "failed" on the tick tribute fell due
         self.food_riot_protection = False  # Suppresses the next Food Riots event, then lapses
+        self.population = starting_groups()  # Hidden from the player; see population.py
+        self.last_upkeep_day: Optional[int] = None
+        self.last_upkeep_available: Optional[int] = None  # Biologics in store at the last upkeep
+        self.last_upkeep_changes: List[GroupChange] = []
         
     def _generate_starting_subordinates(self) -> List[Subordinate]:
         """Generate starting subordinates with random stats"""
@@ -204,19 +216,68 @@ class GameState:
         """Days until the next food upkeep"""
         return FOOD_UPKEEP_INTERVAL_DAYS - self.day % FOOD_UPKEEP_INTERVAL_DAYS
 
+    @property
+    def public_order(self) -> str:
+        """Broad public-order status derived from hidden group contentedness"""
+        return public_order_status(weighted_contentedness(self.population))
+
     def _handle_food_upkeep(self):
-        """Consume the hive's weekly food; a shortfall drives Biologics into deficit"""
+        """Consume the hive's weekly food and feed the population groups from it"""
         available = self.resources.biologics
-        self.resources.deduct(ResourceType.BIOLOGICS, FOOD_UPKEEP_AMOUNT)
-        if available >= FOOD_UPKEEP_AMOUNT:
+        consumed = min(FOOD_UPKEEP_AMOUNT, max(available, 0))
+        self.resources.deduct(ResourceType.BIOLOGICS, consumed)
+        if consumed == FOOD_UPKEEP_AMOUNT:
             self.events_log.append(
                 f"Day {self.day}: Food upkeep: the hive consumes {FOOD_UPKEEP_AMOUNT} Biologics."
             )
         else:
             self.events_log.append(
                 f"Day {self.day}: FOOD SHORTAGE: upkeep needed {FOOD_UPKEEP_AMOUNT} Biologics but only "
-                f"{max(available, 0)} were in store. Biologics now at {self.resources.biologics} (deficit)."
+                f"{consumed} were in store. The hive went {FOOD_UPKEEP_AMOUNT - consumed} short."
             )
+
+        status_before = self.public_order
+        self.last_upkeep_day = self.day
+        self.last_upkeep_available = available
+        self.last_upkeep_changes = feed_groups(self.population, consumed)
+        if self.public_order != status_before:
+            self.events_log.append(f"Day {self.day}: Public order in the hive is now {self.public_order}.")
+
+    def population_debug_report(self) -> str:
+        """Read-only diagnostic text exposing hidden population state. Not for the normal UI."""
+        weighted = weighted_contentedness(self.population)
+        lines = [
+            "DEBUG - hidden population state (not shown to players)",
+            "",
+            f"Day {self.day}; next food upkeep in {self.food_upkeep_due_in} days "
+            f"({FOOD_UPKEEP_AMOUNT} Biologics, fed in the order listed)",
+            "",
+            f"{'Group':<14}{'Population':>12}{'Demand':>8}{'Content':>9}{'Baseline':>10}{'Max penalty':>13}",
+        ]
+        for group in self.population:
+            lines.append(
+                f"{group.name:<14}{group.population:>11}k{group.food_demand:>8}{group.contentedness:>9}"
+                f"{group.baseline:>10}{group.max_shortage_penalty:>13}"
+            )
+        thresholds = ", ".join(f"{status} >= {minimum}" for minimum, status in PUBLIC_ORDER_THRESHOLDS)
+        lines += [
+            "",
+            f"Weighted contentedness: {weighted} -> Public order: {public_order_status(weighted)}",
+            f"Thresholds: {thresholds}",
+            "",
+        ]
+        if self.last_upkeep_day is None:
+            lines.append("Last upkeep: none yet")
+        else:
+            lines.append(
+                f"Last upkeep: Day {self.last_upkeep_day}, {self.last_upkeep_available} Biologics in store"
+            )
+            for change in self.last_upkeep_changes:
+                lines.append(
+                    f"  {change.name:<14} fed {change.fed}/{change.demand}  "
+                    f"contentedness {change.before} -> {change.after} ({change.delta:+d})"
+                )
+        return "\n".join(lines)
 
     def _handle_imperial_tribute(self):
         """Handle imperial tribute payment"""
