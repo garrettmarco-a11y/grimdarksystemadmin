@@ -74,6 +74,7 @@ class StartingStateTests(unittest.TestCase):
                 ("Requisition Food Stores", GovernanceArea.LOGISTICS, 5, 5, 0, None),
                 ("Commission Emergency Food Convoy", GovernanceArea.LOGISTICS, 5, 5, 0, None),
                 ("Restore Order in the Lower Hab-Blocks", GovernanceArea.SECURITY, 5, 5, 0, None),
+                ("Maintain District Security Presence", GovernanceArea.SECURITY, 5, 5, 0, None),
             ],
         )
         self.assertEqual(state.tasks[0].description, "Increase mineral extraction efficiency")

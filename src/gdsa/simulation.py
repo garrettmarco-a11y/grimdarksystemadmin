@@ -13,6 +13,7 @@ from .models import (
     Task,
 )
 from .population import (
+    FULL_PENALTY_PERCENT,
     PUBLIC_ORDER_THRESHOLDS,
     GroupChange,
     feed_groups,
@@ -28,6 +29,11 @@ FOOD_RIOTS_EVENT = "Food riots in the lower sectors - biologics consumed."
 # (Day 7, 14, 21, ...). Upkeep takes only what is in store; a shortfall is not carried as debt.
 FOOD_UPKEEP_INTERVAL_DAYS = 7
 FOOD_UPKEEP_AMOUNT = 10
+
+# Security presence: after the task completes, the next this-many food upkeeps apply
+# shortage contentedness losses at this percentage (a 10% reduction).
+SECURITY_PRESENCE_UPKEEPS = 4
+SECURITY_PRESENCE_PENALTY_PERCENT = 90
 
 class GameState:
     """Main game state manager"""
@@ -47,6 +53,8 @@ class GameState:
         self.last_upkeep_day: Optional[int] = None
         self.last_upkeep_available: Optional[int] = None  # Biologics in store at the last upkeep
         self.last_upkeep_changes: List[GroupChange] = []
+        self.last_upkeep_dampened = False  # Whether security presence reduced the last upkeep's losses
+        self.security_presence_upkeeps = 0  # Upcoming food upkeeps still dampened; 0 = inactive
         
     def _generate_starting_subordinates(self) -> List[Subordinate]:
         """Generate starting subordinates with random stats"""
@@ -91,6 +99,8 @@ class GameState:
         rewards: Optional[Dict[ResourceType, int]] = None,
         cost: Optional[Dict[ResourceType, int]] = None,
         prevents_next_food_riot: bool = False,
+        establishes_security_presence: bool = False,
+        repeatable: bool = False,
     ):
         """Add a task. Duration-based tasks advance once per tick; skill-based tasks roll for progress.
         Cost is paid once, when a subordinate is successfully assigned; rewards are granted once,
@@ -104,6 +114,8 @@ class GameState:
             rewards=dict(rewards or {}),
             cost=dict(cost or {}),
             prevents_next_food_riot=prevents_next_food_riot,
+            establishes_security_presence=establishes_security_presence,
+            repeatable=repeatable,
         )
         self.tasks.append(task)
     
@@ -156,6 +168,7 @@ class GameState:
         self.tribute_outcome = None
         
         # Process tasks
+        reoffered = []
         for task in self.tasks:
             if task.assigned_subordinate and not task.is_complete:
                 subordinate = next(
@@ -190,9 +203,17 @@ class GameState:
                         self.events_log.append(
                             f"Day {self.day}: Order holds in the lower hab-blocks. The next food riot will be suppressed."
                         )
+                    if task.establishes_security_presence:
+                        # Refreshes rather than stacks
+                        self.security_presence_upkeeps = SECURITY_PRESENCE_UPKEEPS
+                        self.events_log.append(
+                            f"Day {self.day}: Enforcer patrols take up posts across the hab-districts."
+                        )
+                    if task.repeatable:
+                        reoffered.append(self._fresh_copy(task))
 
-        # Remove completed tasks
-        self.tasks = [t for t in self.tasks if not t.is_complete]
+        # Remove completed tasks; repeatable ones are offered again
+        self.tasks = [t for t in self.tasks if not t.is_complete] + reoffered
         
         # Resource generation (basic)
         self.resources.add(ResourceType.MATERIALS, random.randint(1, 3))
@@ -211,6 +232,22 @@ class GameState:
         if random.random() < 0.1:
             self._generate_random_event()
     
+    @staticmethod
+    def _fresh_copy(task: Task) -> Task:
+        """An unstarted, unassigned copy of a repeatable task"""
+        return Task(
+            task.name,
+            task.area,
+            required_progress=task.required_progress,
+            description=task.description,
+            duration_ticks=task.duration_ticks,
+            rewards=dict(task.rewards),
+            cost=dict(task.cost),
+            prevents_next_food_riot=task.prevents_next_food_riot,
+            establishes_security_presence=task.establishes_security_presence,
+            repeatable=True,
+        )
+
     @property
     def food_upkeep_due_in(self) -> int:
         """Days until the next food upkeep"""
@@ -239,7 +276,11 @@ class GameState:
         status_before = self.public_order
         self.last_upkeep_day = self.day
         self.last_upkeep_available = available
-        self.last_upkeep_changes = feed_groups(self.population, consumed)
+        self.last_upkeep_dampened = self.security_presence_upkeeps > 0
+        penalty_percent = SECURITY_PRESENCE_PENALTY_PERCENT if self.last_upkeep_dampened else FULL_PENALTY_PERCENT
+        self.last_upkeep_changes = feed_groups(self.population, consumed, penalty_percent)
+        if self.last_upkeep_dampened:
+            self.security_presence_upkeeps -= 1
         if self.public_order != status_before:
             self.events_log.append(f"Day {self.day}: Public order in the hive is now {self.public_order}.")
 
@@ -264,6 +305,9 @@ class GameState:
             "",
             f"Weighted contentedness: {weighted} -> Public order: {public_order_status(weighted)}",
             f"Thresholds: {thresholds}",
+            (f"Security presence: active, next {self.security_presence_upkeeps} upkeep(s) apply "
+             f"shortage losses at {SECURITY_PRESENCE_PENALTY_PERCENT}%"
+             if self.security_presence_upkeeps else "Security presence: inactive"),
             "",
         ]
         if self.last_upkeep_day is None:
@@ -271,6 +315,8 @@ class GameState:
         else:
             lines.append(
                 f"Last upkeep: Day {self.last_upkeep_day}, {self.last_upkeep_available} Biologics in store"
+                + (f", shortage losses at {SECURITY_PRESENCE_PENALTY_PERCENT}% (security presence)"
+                   if self.last_upkeep_dampened else "")
             )
             for change in self.last_upkeep_changes:
                 lines.append(
@@ -360,4 +406,14 @@ def add_starting_tasks(state: GameState):
                     "No resource reward.",
         cost={ResourceType.MATERIALS: 5},
         prevents_next_food_riot=True,
+    )
+    state.add_task(
+        "Maintain District Security Presence",
+        GovernanceArea.SECURITY,
+        duration_ticks=5,
+        description="Post enforcer patrols. Costs 5 Materials when assigned; after 5 days, "
+                    "softens food-shortage discontent for four weekly food upkeeps. Repeatable.",
+        cost={ResourceType.MATERIALS: 5},
+        establishes_security_presence=True,
+        repeatable=True,
     )
